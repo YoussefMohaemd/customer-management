@@ -1,0 +1,41 @@
+﻿/* Tailwind v4 is processed by the @tailwindcss/postcss plugin.
+   PrimeNG styles are injected at runtime through providePrimeNG (Aura preset).
+   primeicons CSS is registered in angular.json → styles. */
+
+@import "tailwindcss";
+
+:root {
+  --font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --p-primary-50: #eef4ff;
+  --p-primary-100: #dce8fd;
+  --p-primary-200: #c0d8fb;
+  --p-primary-300: #94c0f8;
+  --p-primary-400: #619ef2;
+  --p-primary-500: #3d7dec;
+  --p-primary-600: #2860e0;
+  --p-primary-700: #214ccf;
+  --p-primary-800: #203fa8;
+  --p-primary-900: #1f3985;
+  --p-primary-950: #182552;
+  --p-border-radius: 10px;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-family);
+  background-color: #f4f6fa;
+  color: #1f2937;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
