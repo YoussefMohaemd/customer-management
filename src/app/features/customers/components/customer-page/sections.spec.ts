@@ -30,8 +30,7 @@ describe('CustomerActionsComponent', () => {
     const messageService = TestBed.inject(MessageService);
     const addSpy = vi.spyOn(messageService, 'add');
 
-    const button =
-      fixture.nativeElement.querySelectorAll('button')[0];
+    const button = fixture.nativeElement.querySelectorAll('button')[0];
     button?.click();
 
     expect(addSpy).toHaveBeenCalledWith(

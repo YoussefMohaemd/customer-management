@@ -293,6 +293,17 @@ export class CustomerStore {
     this.reloadSource$.next();
   }
 
+  /**
+   * Hard refresh for the pagination Refresh button: always returns to
+   * page 1 and re-runs the query, busting the dedupe cache so a fresh
+   * request reaches the API even when the query is unchanged.
+   */
+  refresh(): void {
+    this.page.set(1);
+    this.lastExecutedQuery = null;
+    this.reloadSource$.next();
+  }
+
   // --- Pagination / sorting (client-side over the loaded set) ----------------
   setPage(page: number): void {
     const bounded = Math.min(Math.max(page, 1), this.totalPages());

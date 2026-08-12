@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  OnInit,
+  computed,
+  inject,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { TooltipModule } from 'primeng/tooltip';
@@ -79,8 +86,14 @@ export class CustomerPageComponent implements OnInit {
     this.store.clearSearch();
   }
 
+  /** Retry the current query (used by the error state). */
   protected reload(): void {
     this.store.reload();
+  }
+
+  /** Refresh button: always resets pagination to page 1 before reloading. */
+  protected refreshTable(): void {
+    this.store.refresh();
   }
 
   protected resetAndReload(): void {

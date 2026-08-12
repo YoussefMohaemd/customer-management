@@ -1,19 +1,37 @@
-<button
-  #columnButton
-  type="button"
-  (click)="panel.toggle($event)"
-  class="column-button"
-  [attr.aria-haspopup]="'dialog'"
-  [attr.aria-expanded]="popoverOpen"
-  aria-label="Choose columns"
->
-  <i class="pi pi-table text-[13px]" aria-hidden="true"></i>
-  <span class="hidden sm:inline">Columns</span>
-  <span class="column-count"
-    >{{ store.visibleColumnCount() }}/{{ store.allColumnDefs().length }}</span
+<div class="column-control" [class.open]="popoverOpen">
+  <!-- Selected columns as removable chips (drag/scroll-only area: clicking
+       it never opens the dropdown — only the arrow trigger does) -->
+  <div #chipsScroll class="column-chips">
+    @for (column of store.selectedColumnDefs(); track column.field) {
+      <span class="column-chip" [class.disabled]="isLastVisible(column.field)">
+        <span class="column-chip-label">{{ column.label }}</span>
+        <button
+          type="button"
+          class="column-chip-remove"
+          [disabled]="isLastVisible(column.field)"
+          (click)="removeColumn($event, column.field)"
+          [attr.aria-label]="'Remove ' + column.label + ' column'"
+        >
+          <i class="pi pi-times" aria-hidden="true"></i>
+        </button>
+      </span>
+    }
+  </div>
+
+  <span class="column-divider" aria-hidden="true"></span>
+
+  <!-- Dropdown trigger (the only element that opens the dropdown) -->
+  <button
+    type="button"
+    class="column-arrow"
+    (click)="panel.toggle($event)"
+    [attr.aria-haspopup]="'dialog'"
+    [attr.aria-expanded]="popoverOpen"
+    aria-label="Choose columns"
   >
-  <i class="pi pi-angle-down text-[10px] text-slate-400" aria-hidden="true"></i>
-</button>
+    <i class="pi pi-angle-down text-[10px] text-slate-400" aria-hidden="true"></i>
+  </button>
+</div>
 
 <p-popover
   #panel
@@ -24,31 +42,50 @@
 >
   <ng-template pTemplate="content">
     <div class="column-panel">
-      <div class="column-panel-head">
-        <span class="column-panel-title">Columns</span>
+      <!-- Compact search + check/select control, side by side -->
+      <div class="column-search-row">
         <button
           type="button"
-          class="reset-btn"
-          (click)="reset()"
-          aria-label="Reset columns to defaults"
+          class="column-select-btn"
+          (click)="confirmActive()"
+          [disabled]="!activeOption()"
+          aria-label="Select the highlighted field"
         >
-          Reset
+          <i class="pi pi-check" aria-hidden="true"></i>
         </button>
+         <div class="column-search">
+          <input
+            type="text"
+            class="column-search-input"
+            [value]="searchTerm()"
+            (input)="onSearchInput($event)"
+            aria-label="Search fields"
+          />
+          <i class="pi pi-search column-search-icon" aria-hidden="true"></i>
+        </div>
       </div>
-      <p class="column-panel-hint">Choose which API fields appear in the table.</p>
+
+      <!-- All API-supported fields, filtered while typing -->
       <ul class="column-list">
-        @for (column of store.allColumnDefs(); track column.field) {
+        @for (column of filteredColumnDefs(); track column.field) {
           <li>
-            <label class="column-option" [class.disabled]="isLastVisible(column.field)">
-              <input
-                type="checkbox"
-                class="column-check"
-                [checked]="store.isColumnVisible(column.field)"
-                [disabled]="isLastVisible(column.field)"
-                (change)="toggle(column.field, $event.target.checked)"
-              />
+            <button
+              type="button"
+              class="column-option"
+              [class.selected]="store.isColumnVisible(column.field)"
+              [class.active]="activeOption() === column.field"
+              [class.disabled]="isLastVisible(column.field)"
+              (click)="toggleOption(column.field)"
+              (mouseenter)="setActive(column.field)"
+              [attr.aria-pressed]="store.isColumnVisible(column.field)"
+            >
+              <i
+                class="pi pi-check column-check-icon"
+                [class.visible]="store.isColumnVisible(column.field)"
+                aria-hidden="true"
+              ></i>
               <span class="column-label">{{ column.label }}</span>
-            </label>
+            </button>
           </li>
         }
       </ul>

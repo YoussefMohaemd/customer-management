@@ -1,122 +1,304 @@
 :host {
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
 }
 
-.column-button {
+/* Control shell: white selector box (border, radius, shadow, hover)
+   hosting an inline horizontally scrollable chip strip + fixed arrow.
+   Compact height so it does not dominate the toolbar row. */
+.column-control {
   display: inline-flex;
   height: 36px;
   align-items: center;
-  gap: 7px;
+  max-width: 460px;
   border-radius: 6px;
   border: 1px solid #dfe5ee;
   background-color: #fff;
-  padding-inline: 12px;
-  font-size: 13px;
-  font-weight: 500;
-  font-family: inherit;
-  color: #3f4a5c;
-  cursor: pointer;
   box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
   transition:
     border-color 150ms ease,
     background-color 150ms ease;
 
   &:hover {
-    border-color: #c3cede;
-    background-color: #f6f9fd;
+    border-color: #c9d8cd;
+    background-color: #fbfdfc;
+  }
+
+  &.open {
+    border-color: #a9dcc3;
+    background-color: #fbfdfc;
+  }
+
+  &:focus-within {
+    outline: none;
+    box-shadow: 0 0 0 2px rgb(16 185 129 / 0.4);
+  }
+}
+
+/* Chip strip: always ONE horizontal row. Overflow is handled with
+   horizontal scrolling; selected columns are never wrapped, hidden or
+   removed. The dropdown trigger stays fixed outside this scroll area. */
+.column-chips {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+  height: 36px;
+  padding-inline: 6px;
+  padding-block: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  cursor: grab;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  &.dragging {
+    cursor: grabbing;
+    user-select: none;
+  }
+}
+
+/* Light gray chip with black label (unchanged design). */
+.column-chip {
+  display: inline-flex;
+  height: 24px;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  border-radius: 4px;
+  border: 1px solid #d9e3ef;
+  background-color: #f6f6f7;
+  padding-left: 7px;
+  padding-right: 3px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #111827;
+  white-space: nowrap;
+
+  &.disabled {
+    opacity: 0.55;
+  }
+}
+
+.column-chip-label {
+  line-height: 1;
+}
+
+/* Small circular X: white circle, dark border, black X. Hover is a very
+   subtle grayscale interaction only — no colored feedback. */
+.column-chip-remove {
+  display: inline-flex;
+  width: 15px;
+  height: 15px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #707070;
+  border-radius: 50%;
+  padding: 0;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: #000;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    color: #000;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
   }
 
   &:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px rgb(43 99 224 / 0.5);
+    box-shadow: 0 0 0 2px rgb(16 185 129 / 0.4);
   }
 }
 
-.column-count {
-  display: inline-flex;
-  min-width: 22px;
+.column-divider {
+  width: 1px;
   height: 18px;
+  flex: none;
+  background-color: #e5e7eb;
+}
+
+/* Dropdown trigger: green accent on hover/open; the only element that
+   opens the dropdown. */
+.column-arrow {
+  display: inline-flex;
+  width: 26px;
+  height: 34px;
+  flex: none;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
-  background-color: #eef3fb;
-  border: 1px solid #d9e5f3;
-  padding-inline: 5px;
-  font-size: 10px;
-  font-weight: 600;
-  color: #2c5a8f;
-}
-
-.column-panel {
-  width: 260px;
-  padding: 12px;
-}
-
-.column-panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.column-panel-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #2b3a4a;
-}
-
-.reset-btn {
   border: none;
-  background: none;
-  padding: 0;
-  font-size: 12px;
-  font-weight: 500;
-  font-family: inherit;
-  color: #2c7fff;
+  background: transparent;
+  color: #64748b;
   cursor: pointer;
+  transition: color 120ms ease;
 
   &:hover {
-    text-decoration: underline;
+    color: #059669;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px rgb(16 185 129 / 0.5);
+    border-radius: 4px;
   }
 }
 
-.column-panel-hint {
-  margin: 4px 0 8px;
-  font-size: 11px;
-  color: #8b97a8;
+/* Dropdown panel: compact, no titles/hints — just search + field list. */
+.column-panel {
+  width: 240px;
+  padding: 8px;
+}
+
+/* Compact search bar with magnifying-glass icon and ✓ select control. */
+.column-search-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.column-search-row .column-select-btn {
+  width: 30px;
+  height: 30px;
+}
+
+.column-search-row .column-search {
+  flex: 1;
+  min-width: 0;
+}
+
+.column-search {
+  display: flex;
+  height: 30px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #dbe2ea;
+  border-radius: 4px;
+  background-color: #fff;
+  padding-inline: 8px;
+
+  &:focus-within {
+    border-color: #10b981;
+    box-shadow: 0 0 0 2px rgb(16 185 129 / 0.3);
+  }
+}
+
+.column-search-icon {
+  flex: none;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.column-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 12px;
+  font-family: inherit;
+  color: #1f2937;
+
+  &::placeholder {
+    color: #9ca3af;
+  }
+
+  &:focus {
+    outline: none;
+  }
+}
+
+/* ✓ select control: confirms the highlighted (first) filtered field. */
+.column-select-btn {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 4px;
+  background-color: #d1fae5;
+  color: #047857;
+  font-size: 10px;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+
+  &:hover:not(:disabled) {
+    background-color: #a7f3d0;
+    color: #065f46;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgb(16 185 129 / 0.4);
+  }
 }
 
 .column-list {
   display: flex;
   flex-direction: column;
-  max-height: 280px;
+  max-height: 240px;
   overflow-y: auto;
-  margin: 0;
-  padding: 4px 0;
+  margin: 8px 0 0;
+  padding: 2px 0;
   list-style: none;
   border-top: 1px solid #eef1f5;
 
   li {
-    border-bottom: 1px solid #f3f6fa;
-
-    &:last-child {
+    &:last-child .column-option {
       border-bottom: none;
     }
   }
 }
 
+/* Compact selectable row: subtle green hover/selected states. */
 .column-option {
   display: flex;
+  width: 100%;
   align-items: center;
-  gap: 8px;
-  padding: 6px 6px;
+  gap: 7px;
+  border: none;
+  border-bottom: 1px solid #f3f6fa;
   border-radius: 4px;
+  background: transparent;
+  padding: 5px 6px;
   font-size: 12px;
-  color: #3d4757;
+  font-family: inherit;
+  text-align: left;
+  color: #374151;
   cursor: pointer;
 
   &:hover {
-    background-color: #f5f8fc;
+    background-color: rgb(16 185 129 / 0.08);
+  }
+
+  &.selected {
+    background-color: rgb(16 185 129 / 0.12);
+    color: #1f2937;
+  }
+
+  &.active {
+    box-shadow: inset 0 0 0 1px rgb(16 185 129 / 0.4);
   }
 
   &.disabled {
@@ -125,14 +307,22 @@
   }
 }
 
-.column-check {
-  width: 14px;
-  height: 14px;
-  margin: 0;
-  accent-color: #2c7fff;
-  cursor: pointer;
+/* Small green check shown only on selected rows. */
+.column-check-icon {
+  flex: none;
+  font-size: 10px;
+  color: #059669;
+  opacity: 0;
+
+  &.visible {
+    opacity: 1;
+  }
 }
 
 .column-label {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
