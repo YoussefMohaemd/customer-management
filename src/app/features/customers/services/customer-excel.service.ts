@@ -24,7 +24,7 @@ const EXPORT_HEADERS: readonly (keyof CustomerExportRow)[] = [
   'Client Type',
   'Account Manager',
   'City',
-  'Country'
+  'Country',
 ];
 
 /**
@@ -49,12 +49,12 @@ export class CustomerExcelService {
       'Client Type': record.accountTypeId ?? '',
       'Account Manager': record.accountManagerId ?? '',
       City: record.city,
-      Country: record.country
+      Country: record.country,
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(rows, { header: [...EXPORT_HEADERS] });
     worksheet['!cols'] = EXPORT_HEADERS.map((header) => ({
-      wch: Math.max(header.length + 4, this.columnWidth(rows, header))
+      wch: Math.max(header.length + 4, this.columnWidth(rows, header)),
     }));
 
     const workbook = XLSX.utils.book_new();
@@ -79,7 +79,7 @@ export class CustomerExcelService {
     const stamp = [
       now.getFullYear(),
       String(now.getMonth() + 1).padStart(2, '0'),
-      String(now.getDate()).padStart(2, '0')
+      String(now.getDate()).padStart(2, '0'),
     ].join('-');
     return `customers_${stamp}.xlsx`;
   }

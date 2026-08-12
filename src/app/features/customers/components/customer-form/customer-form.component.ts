@@ -1,5 +1,12 @@
 import { ChangeDetectionStrategy, Component, effect, inject, input, output } from '@angular/core';
-import { AbstractControl, FormControl, FormGroup, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
+import {
+  AbstractControl,
+  FormControl,
+  FormGroup,
+  ReactiveFormsModule,
+  ValidatorFn,
+  Validators,
+} from '@angular/forms';
 import { InputTextModule } from 'primeng/inputtext';
 import { DatePickerModule } from 'primeng/datepicker';
 import { SelectModule } from 'primeng/select';
@@ -8,7 +15,10 @@ import { ButtonModule } from 'primeng/button';
 import { DividerModule } from 'primeng/divider';
 
 import { CustomerPayload, CustomerRecord } from '@features/customers/models/customer.model';
-import { CustomerFormValues, toCustomerPayload } from '@features/customers/models/customer-form.model';
+import {
+  CustomerFormValues,
+  toCustomerPayload,
+} from '@features/customers/models/customer-form.model';
 import { CustomerStore } from '@features/customers/state/customer.store';
 
 export type CustomerFormMode = 'create' | 'edit' | 'view';
@@ -34,7 +44,15 @@ interface Section {
  */
 @Component({
   selector: 'app-customer-form',
-  imports: [ReactiveFormsModule, InputTextModule, DatePickerModule, SelectModule, TextareaModule, ButtonModule, DividerModule],
+  imports: [
+    ReactiveFormsModule,
+    InputTextModule,
+    DatePickerModule,
+    SelectModule,
+    TextareaModule,
+    ButtonModule,
+    DividerModule,
+  ],
   template: `
     <form [formGroup]="form" class="flex flex-col" (ngSubmit)="submit()" novalidate>
       <!-- Error summary -->
@@ -54,7 +72,10 @@ interface Section {
       @for (section of sections; track section.title) {
         <div class="mb-6 last:mb-0">
           <div class="mb-3 flex items-center gap-2">
-            <div class="flex h-7 w-7 items-center justify-center rounded-md bg-blue-50 text-blue-600" aria-hidden="true">
+            <div
+              class="flex h-7 w-7 items-center justify-center rounded-md bg-blue-50 text-blue-600"
+              aria-hidden="true"
+            >
               <i [class]="section.icon" class="pi text-xs"></i>
             </div>
             <h3 class="text-sm font-bold text-slate-800">{{ section.title }}</h3>
@@ -64,7 +85,10 @@ interface Section {
           <div class="grid grid-cols-1 gap-x-4 gap-y-4 md:grid-cols-2 xl:grid-cols-4">
             @for (field of section.fields; track field.label) {
               <div [class]="field.span ?? ''">
-                <label [for]="'customer-' + field.control" class="mb-1 block text-xs font-semibold text-slate-600">
+                <label
+                  [for]="'customer-' + field.control"
+                  class="mb-1 block text-xs font-semibold text-slate-600"
+                >
                   {{ field.label }}
                   @if (isRequired(field.control)) {
                     <span class="text-red-500" aria-hidden="true">*</span>
@@ -122,7 +146,9 @@ interface Section {
                   }
                 }
                 @if (isInvalid(field.control)) {
-                  <small class="mt-1 block text-xs text-red-500">{{ errorMessage(field.control) }}</small>
+                  <small class="mt-1 block text-xs text-red-500">{{
+                    errorMessage(field.control)
+                  }}</small>
                 }
               </div>
             }
@@ -162,7 +188,7 @@ interface Section {
       </div>
     </form>
   `,
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CustomerFormComponent {
   readonly mode = input<CustomerFormMode>('create');
@@ -203,7 +229,10 @@ export class CustomerFormComponent {
     swiftCode: new FormControl('', [Validators.pattern(SWIFT_PATTERN)]),
     payeeBank: new FormControl('', [Validators.maxLength(200)]),
     vatRegistrationNumber: new FormControl('', [Validators.minLength(8), Validators.maxLength(20)]),
-    groupVatRegistrationNumber: new FormControl('', [Validators.minLength(8), Validators.maxLength(20)]),
+    groupVatRegistrationNumber: new FormControl('', [
+      Validators.minLength(8),
+      Validators.maxLength(20),
+    ]),
     commercialRegistrationNumber: new FormControl('', [Validators.maxLength(50)]),
     taxFileNumber: new FormControl('', [Validators.maxLength(50)]),
     contNameAR: new FormControl('', [Validators.maxLength(100)]),
@@ -211,7 +240,7 @@ export class CustomerFormComponent {
     contAddress: new FormControl('', [Validators.maxLength(300)]),
     contMobile: new FormControl('', [Validators.pattern(PHONE_PATTERN), Validators.maxLength(20)]),
     contEmail: new FormControl('', [Validators.email, Validators.maxLength(150)]),
-    contPhone: new FormControl('', [Validators.pattern(PHONE_PATTERN), Validators.maxLength(20)])
+    contPhone: new FormControl('', [Validators.pattern(PHONE_PATTERN), Validators.maxLength(20)]),
   });
 
   protected readonly sections = this.buildSections();
@@ -244,7 +273,7 @@ export class CustomerFormComponent {
       accountManagerId: customer.accountManagerId,
       vatRegistrationNumber: customer.vatRegistrationNumber,
       commercialRegistrationNumber: customer.commercialRegistrationNumber,
-      taxFileNumber: customer.taxFileNumber
+      taxFileNumber: customer.taxFileNumber,
     });
   }
 
@@ -305,7 +334,7 @@ export class CustomerFormComponent {
       contAddress: raw.contAddress ?? '',
       contMobile: raw.contMobile ?? '',
       contEmail: raw.contEmail ?? '',
-      contPhone: raw.contPhone ?? ''
+      contPhone: raw.contPhone ?? '',
     };
   }
 
@@ -382,8 +411,8 @@ export class CustomerFormComponent {
           { label: 'Legal English Name', control: 'nameEN' },
           { label: 'Legal French Name', control: 'nameFR' },
           { label: 'Job Title', control: 'jobTitle' },
-          { label: 'Birth Date', control: 'birthDate' }
-        ]
+          { label: 'Birth Date', control: 'birthDate' },
+        ],
       },
       {
         title: 'Contact Information',
@@ -394,16 +423,16 @@ export class CustomerFormComponent {
           { label: 'Phone', control: 'phone' },
           { label: 'Phone 2', control: 'phone2' },
           { label: 'Fax', control: 'fax' },
-          { label: 'Website', control: 'website' }
-        ]
+          { label: 'Website', control: 'website' },
+        ],
       },
       {
         title: 'Identity',
         icon: 'pi-shield',
         fields: [
           { label: 'National ID', control: 'nationalId' },
-          { label: 'Passport Number', control: 'passportNo' }
-        ]
+          { label: 'Passport Number', control: 'passportNo' },
+        ],
       },
       {
         title: 'Address',
@@ -417,8 +446,8 @@ export class CustomerFormComponent {
           { label: 'Country', control: 'country' },
           { label: 'City', control: 'city' },
           { label: 'Building Number', control: 'buildingNumber' },
-          { label: 'Postal Code', control: 'postalCode' }
-        ]
+          { label: 'Postal Code', control: 'postalCode' },
+        ],
       },
       {
         title: 'Business / Financial',
@@ -431,8 +460,8 @@ export class CustomerFormComponent {
           { label: 'Payee Bank', control: 'payeeBank' },
           { label: 'Swift Number', control: 'swiftCode' },
           { label: 'Commercial Registration Number', control: 'commercialRegistrationNumber' },
-          { label: 'Tax File Number', control: 'taxFileNumber' }
-        ]
+          { label: 'Tax File Number', control: 'taxFileNumber' },
+        ],
       },
       {
         title: 'Contact Person',
@@ -443,9 +472,9 @@ export class CustomerFormComponent {
           { label: 'Contact Address', control: 'contAddress', span: 'md:col-span-2 xl:col-span-2' },
           { label: 'Contact Mobile', control: 'contMobile' },
           { label: 'Contact Email', control: 'contEmail' },
-          { label: 'Contact Phone', control: 'contPhone' }
-        ]
-      }
+          { label: 'Contact Phone', control: 'contPhone' },
+        ],
+      },
     ];
   }
 }

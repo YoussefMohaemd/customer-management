@@ -41,7 +41,7 @@ import { ReportsSectionComponent } from '@features/customers/components/customer
     CustomerTableComponent,
     CustomerFormDialogComponent,
     ActionsSectionComponent,
-    ReportsSectionComponent
+    ReportsSectionComponent,
   ],
   template: `
     <div class="mx-auto flex w-full max-w-[1400px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -55,8 +55,10 @@ import { ReportsSectionComponent } from '@features/customers/components/customer
               · {{ store.totalRecords().toLocaleString() }} matching records
             }
             @if (store.hasServerSearch() || store.hasFilters()) {
-              · {{ store.sortedRecords().length.toLocaleString() }} after {{ store.hasServerSearch() ? 'search' : '' }}
-              {{ store.hasServerSearch() && store.hasFilters() ? 'and' : '' }} {{ store.hasFilters() ? 'filters' : '' }}
+              · {{ store.sortedRecords().length.toLocaleString() }} after
+              {{ store.hasServerSearch() ? 'search' : '' }}
+              {{ store.hasServerSearch() && store.hasFilters() ? 'and' : '' }}
+              {{ store.hasFilters() ? 'filters' : '' }}
             }
           </p>
         </div>
@@ -68,7 +70,11 @@ import { ReportsSectionComponent } from '@features/customers/components/customer
             severity="contrast"
             (onClick)="exportExcel()"
             [disabled]="store.sortedRecords().length === 0"
-            [pTooltip]="store.sortedRecords().length === 0 ? 'Nothing to export yet' : 'Export the current result set'"
+            [pTooltip]="
+              store.sortedRecords().length === 0
+                ? 'Nothing to export yet'
+                : 'Export the current result set'
+            "
             tooltipPosition="top"
           />
           <p-button label="Add Customer" icon="pi pi-plus" (onClick)="store.openCreateForm()" />
@@ -98,12 +104,20 @@ import { ReportsSectionComponent } from '@features/customers/components/customer
 
         <!-- Error state -->
         @if (store.error() && !store.loading()) {
-          <div class="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center" role="alert">
-            <div class="flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-500" aria-hidden="true">
+          <div
+            class="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center"
+            role="alert"
+          >
+            <div
+              class="flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-500"
+              aria-hidden="true"
+            >
               <i class="pi pi-exclamation-circle text-2xl"></i>
             </div>
             <div>
-              <div class="text-base font-semibold text-slate-800">We couldn't load your customers</div>
+              <div class="text-base font-semibold text-slate-800">
+                We couldn't load your customers
+              </div>
               <p class="mx-auto mt-1 max-w-md text-sm text-slate-500">{{ store.error() }}</p>
             </div>
             <div class="flex items-center gap-2">
@@ -158,7 +172,7 @@ import { ReportsSectionComponent } from '@features/customers/components/customer
     <app-customer-form-dialog />
     <p-confirmdialog [style]="{ width: 'min(92vw, 440px)' }" />
   `,
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CustomerPageComponent implements OnInit {
   protected readonly store = inject(CustomerStore);
@@ -180,14 +194,14 @@ export class CustomerPageComponent implements OnInit {
         debounceTime(environment.customers.searchDebounceMs),
         distinctUntilChanged(),
         switchMap((term) => this.store.searchCustomers(term).pipe(catchError(() => EMPTY))),
-        takeUntilDestroyed(this.destroyRef)
+        takeUntilDestroyed(this.destroyRef),
       )
       .subscribe();
 
     this.reload$
       .pipe(
         switchMap(() => this.store.loadCustomers().pipe(catchError(() => EMPTY))),
-        takeUntilDestroyed(this.destroyRef)
+        takeUntilDestroyed(this.destroyRef),
       )
       .subscribe();
 
@@ -223,7 +237,12 @@ export class CustomerPageComponent implements OnInit {
   protected exportExcel(): void {
     const records = this.store.sortedRecords();
     if (records.length === 0) {
-      this.messageService.add({ severity: 'warn', summary: 'Nothing to export', detail: 'There are no matching customers to export.', life: 3000 });
+      this.messageService.add({
+        severity: 'warn',
+        summary: 'Nothing to export',
+        detail: 'There are no matching customers to export.',
+        life: 3000,
+      });
       return;
     }
     this.excelService.exportCustomers(records);
@@ -231,7 +250,7 @@ export class CustomerPageComponent implements OnInit {
       severity: 'success',
       summary: 'Export started',
       detail: `${records.length.toLocaleString()} customers exported to Excel (current result set).`,
-      life: 4000
+      life: 4000,
     });
   }
 
@@ -248,10 +267,11 @@ export class CustomerPageComponent implements OnInit {
         this.messageService.add({
           severity: 'info',
           summary: 'Delete unavailable',
-          detail: 'The staging API does not expose a remove-customer endpoint. Deleting is not simulated.',
-          life: 4000
+          detail:
+            'The staging API does not expose a remove-customer endpoint. Deleting is not simulated.',
+          life: 4000,
         });
-      }
+      },
     });
   }
 }

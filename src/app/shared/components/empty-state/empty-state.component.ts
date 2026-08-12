@@ -29,7 +29,7 @@ import { ButtonModule } from 'primeng/button';
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EmptyStateComponent {
   readonly icon = input('pi-inbox');

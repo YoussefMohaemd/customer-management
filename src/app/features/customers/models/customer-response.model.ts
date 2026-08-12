@@ -27,7 +27,12 @@ function readNumber(value: unknown): number | null {
  */
 export function normalizeSaveCustomerResult(raw: unknown): SaveCustomerResult {
   if (typeof raw === 'boolean') {
-    return { success: raw, message: raw ? 'Customer saved successfully.' : 'The customer could not be saved.', id: null, raw };
+    return {
+      success: raw,
+      message: raw ? 'Customer saved successfully.' : 'The customer could not be saved.',
+      id: null,
+      raw,
+    };
   }
   if (typeof raw === 'number') {
     return { success: true, message: 'Customer saved successfully.', id: raw, raw };
@@ -37,7 +42,12 @@ export function normalizeSaveCustomerResult(raw: unknown): SaveCustomerResult {
   }
   if (typeof raw === 'object' && raw !== null) {
     const record = raw as Record<string, unknown>;
-    const successValue = record['Success'] ?? record['success'] ?? record['IsSuccess'] ?? record['succeeded'] ?? record['Status'];
+    const successValue =
+      record['Success'] ??
+      record['success'] ??
+      record['IsSuccess'] ??
+      record['succeeded'] ??
+      record['Status'];
     const success =
       typeof successValue === 'boolean'
         ? successValue
@@ -46,9 +56,11 @@ export function normalizeSaveCustomerResult(raw: unknown): SaveCustomerResult {
           : true;
     return {
       success,
-      message: readString(record['Message'] ?? record['message'] ?? record['Error'] ?? record['error']),
+      message: readString(
+        record['Message'] ?? record['message'] ?? record['Error'] ?? record['error'],
+      ),
       id: readNumber(record['Id'] ?? record['id'] ?? record['CustomerId']),
-      raw
+      raw,
     };
   }
   return { success: false, message: 'The customer could not be saved.', id: null, raw };

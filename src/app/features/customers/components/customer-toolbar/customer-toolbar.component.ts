@@ -8,7 +8,7 @@ import { CustomerStore } from '@features/customers/state/customer.store';
 import { CustomerFiltersComponent } from '@features/customers/components/customer-filters/customer-filters.component';
 import {
   CustomerFilterKey,
-  CustomerTextFilterKey
+  CustomerTextFilterKey,
 } from '@features/customers/models/customer-query.model';
 
 interface FilterChip {
@@ -22,14 +22,14 @@ const TEXT_FILTER_LABELS: Record<CustomerTextFilterKey, string> = {
   code: 'Code',
   name: 'Name',
   email: 'Email',
-  mobile: 'Mobile'
+  mobile: 'Mobile',
 };
 
 const CATEGORICAL_FILTER_LABELS: Record<CustomerFilterKey, string> = {
   clientTypeId: 'Client Type',
   accountManagerId: 'Account Manager',
   cityId: 'City',
-  countryId: 'Country'
+  countryId: 'Country',
 };
 
 /**
@@ -114,7 +114,7 @@ const CATEGORICAL_FILTER_LABELS: Record<CustomerFilterKey, string> = {
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CustomerToolbarComponent {
   readonly searchValue = input('');
@@ -126,23 +126,42 @@ export class CustomerToolbarComponent {
   protected readonly activeChips = computed<FilterChip[]>(() => {
     const chips: FilterChip[] = [];
     const textFilters = this.store.textFilters();
-    for (const [key, value] of Object.entries(textFilters) as [CustomerTextFilterKey, string | undefined][]) {
+    for (const [key, value] of Object.entries(textFilters) as [
+      CustomerTextFilterKey,
+      string | undefined,
+    ][]) {
       if (value?.trim()) {
         chips.push({ key, label: TEXT_FILTER_LABELS[key], value: value.trim() });
       }
     }
     const filters = this.store.filters();
     if (filters.clientTypeId !== null) {
-      chips.push({ key: 'clientTypeId', label: CATEGORICAL_FILTER_LABELS.clientTypeId, value: this.filterLabel('clientTypeId') });
+      chips.push({
+        key: 'clientTypeId',
+        label: CATEGORICAL_FILTER_LABELS.clientTypeId,
+        value: this.filterLabel('clientTypeId'),
+      });
     }
     if (filters.accountManagerId !== null) {
-      chips.push({ key: 'accountManagerId', label: CATEGORICAL_FILTER_LABELS.accountManagerId, value: this.filterLabel('accountManagerId') });
+      chips.push({
+        key: 'accountManagerId',
+        label: CATEGORICAL_FILTER_LABELS.accountManagerId,
+        value: this.filterLabel('accountManagerId'),
+      });
     }
     if (filters.cityId !== null) {
-      chips.push({ key: 'cityId', label: CATEGORICAL_FILTER_LABELS.cityId, value: this.filterLabel('cityId') });
+      chips.push({
+        key: 'cityId',
+        label: CATEGORICAL_FILTER_LABELS.cityId,
+        value: this.filterLabel('cityId'),
+      });
     }
     if (filters.countryId !== null) {
-      chips.push({ key: 'countryId', label: CATEGORICAL_FILTER_LABELS.countryId, value: this.filterLabel('countryId') });
+      chips.push({
+        key: 'countryId',
+        label: CATEGORICAL_FILTER_LABELS.countryId,
+        value: this.filterLabel('countryId'),
+      });
     }
     return chips;
   });
@@ -170,14 +189,22 @@ export class CustomerToolbarComponent {
       clientTypeId: this.store.clientTypeOptions(),
       accountManagerId: this.store.accountManagerOptions(),
       cityId: this.store.cityOptions(),
-      countryId: this.store.countryOptions()
+      countryId: this.store.countryOptions(),
     }[key];
     return options.find((option) => option.value === value)?.label ?? String(value);
   }
 }
 
-const TEXT_FILTER_KEYS: ReadonlySet<CustomerTextFilterKey> = new Set(['id', 'code', 'name', 'email', 'mobile']);
+const TEXT_FILTER_KEYS: ReadonlySet<CustomerTextFilterKey> = new Set([
+  'id',
+  'code',
+  'name',
+  'email',
+  'mobile',
+]);
 
-function isTextFilterKey(key: CustomerTextFilterKey | CustomerFilterKey): key is CustomerTextFilterKey {
+function isTextFilterKey(
+  key: CustomerTextFilterKey | CustomerFilterKey,
+): key is CustomerTextFilterKey {
   return TEXT_FILTER_KEYS.has(key as CustomerTextFilterKey);
 }

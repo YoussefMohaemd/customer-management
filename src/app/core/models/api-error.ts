@@ -7,7 +7,7 @@ export enum ApiErrorCode {
   UnprocessableEntity = 422,
   TooManyRequests = 429,
   ServerError = 500,
-  NetworkError = 0
+  NetworkError = 0,
 }
 
 const CODE_BY_STATUS: Partial<Record<number, keyof typeof ApiErrorCode>> = {
@@ -19,7 +19,7 @@ const CODE_BY_STATUS: Partial<Record<number, keyof typeof ApiErrorCode>> = {
   [ApiErrorCode.Conflict]: 'Conflict',
   [ApiErrorCode.UnprocessableEntity]: 'UnprocessableEntity',
   [ApiErrorCode.TooManyRequests]: 'TooManyRequests',
-  [ApiErrorCode.ServerError]: 'ServerError'
+  [ApiErrorCode.ServerError]: 'ServerError',
 };
 
 export class ApiError extends Error {
@@ -50,7 +50,7 @@ const USER_MESSAGES: Record<number, string> = {
   500: 'Something went wrong on the server. Please try again later.',
   502: 'The server returned an invalid response. Please try again later.',
   503: 'The service is temporarily unavailable. Please try again later.',
-  504: 'The server took too long to respond. Please try again later.'
+  504: 'The server took too long to respond. Please try again later.',
 };
 
 export function toUserFriendlyMessage(status: number): string {

@@ -23,11 +23,23 @@ const COLUMNS: readonly ColumnDef[] = [
   { field: 'id', header: 'Client Type', sortable: false },
   { field: 'id', header: 'Account Manager', sortable: false },
   { field: 'city', header: 'City', sortable: true },
-  { field: 'country', header: 'Country', sortable: true }
+  { field: 'country', header: 'Country', sortable: true },
 ];
 
-const TYPE_SEVERITIES: readonly ('info' | 'success' | 'warn' | 'danger')[] = ['info', 'success', 'warn', 'danger'];
-const AVATAR_PALETTE: readonly string[] = ['#2563eb', '#7c3aed', '#0891b2', '#059669', '#d97706', '#dc2626'];
+const TYPE_SEVERITIES: readonly ('info' | 'success' | 'warn' | 'danger')[] = [
+  'info',
+  'success',
+  'warn',
+  'danger',
+];
+const AVATAR_PALETTE: readonly string[] = [
+  '#2563eb',
+  '#7c3aed',
+  '#0891b2',
+  '#059669',
+  '#d97706',
+  '#dc2626',
+];
 
 /**
  * PrimeNG data grid for the customer page.
@@ -91,7 +103,9 @@ const AVATAR_PALETTE: readonly string[] = ['#2563eb', '#7c3aed', '#0891b2', '#05
                 {{ initials(customer) }}
               </div>
               <div class="min-w-0 leading-tight">
-                <div class="truncate text-sm font-medium text-slate-800">{{ customer.commercialName || '—' }}</div>
+                <div class="truncate text-sm font-medium text-slate-800">
+                  {{ customer.commercialName || '—' }}
+                </div>
                 @if (customer.nameAr) {
                   <div class="truncate text-xs text-slate-400" dir="rtl">{{ customer.nameAr }}</div>
                 }
@@ -100,7 +114,11 @@ const AVATAR_PALETTE: readonly string[] = ['#2563eb', '#7c3aed', '#0891b2', '#05
           </td>
           <td>
             @if (customer.email) {
-              <a [href]="'mailto:' + customer.email" class="text-sm text-blue-600 hover:underline">{{ customer.email }}</a>
+              <a
+                [href]="'mailto:' + customer.email"
+                class="text-sm text-blue-600 hover:underline"
+                >{{ customer.email }}</a
+              >
             } @else {
               <span class="text-sm text-slate-300">—</span>
             }
@@ -109,10 +127,15 @@ const AVATAR_PALETTE: readonly string[] = ['#2563eb', '#7c3aed', '#0891b2', '#05
             <span class="text-sm text-slate-600" dir="ltr">{{ customer.mobile || '—' }}</span>
           </td>
           <td>
-            <p-tag [value]="customer.accountTypeId ? 'Type ' + customer.accountTypeId : '—'" [severity]="typeSeverity(customer.accountTypeId)" />
+            <p-tag
+              [value]="customer.accountTypeId ? 'Type ' + customer.accountTypeId : '—'"
+              [severity]="typeSeverity(customer.accountTypeId)"
+            />
           </td>
           <td>
-            <span class="text-sm text-slate-600">{{ customer.accountManagerId ? 'AM #' + customer.accountManagerId : '—' }}</span>
+            <span class="text-sm text-slate-600">{{
+              customer.accountManagerId ? 'AM #' + customer.accountManagerId : '—'
+            }}</span>
           </td>
           <td class="text-sm text-slate-600">{{ customer.city || '—' }}</td>
           <td class="text-sm text-slate-600">{{ customer.country || '—' }}</td>
@@ -151,7 +174,7 @@ const AVATAR_PALETTE: readonly string[] = ['#2563eb', '#7c3aed', '#0891b2', '#05
       </ng-template>
     </p-table>
   `,
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CustomerTableComponent {
   protected readonly store = inject(CustomerStore);
@@ -162,7 +185,8 @@ export class CustomerTableComponent {
 
   protected readonly onView = (customer: CustomerRecord): void => this.store.openViewForm(customer);
   protected readonly onEdit = (customer: CustomerRecord): void => this.store.openEditForm(customer);
-  protected readonly onDelete = (customer: CustomerRecord): void => this.deleteRequested.emit(customer);
+  protected readonly onDelete = (customer: CustomerRecord): void =>
+    this.deleteRequested.emit(customer);
 
   protected sortIcon(field: CustomerSortField): string {
     if (this.store.sortField() !== field) {
@@ -187,7 +211,9 @@ export class CustomerTableComponent {
     return AVATAR_PALETTE[id % AVATAR_PALETTE.length];
   }
 
-  protected typeSeverity(typeId: number | null): 'info' | 'success' | 'warn' | 'danger' | 'secondary' {
+  protected typeSeverity(
+    typeId: number | null,
+  ): 'info' | 'success' | 'warn' | 'danger' | 'secondary' {
     if (typeId === null) {
       return 'secondary';
     }

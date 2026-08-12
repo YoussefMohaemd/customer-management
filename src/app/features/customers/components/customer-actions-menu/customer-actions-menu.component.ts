@@ -14,7 +14,7 @@ const UNAVAILABLE_ACTIONS: readonly { label: string; icon: string }[] = [
   { label: 'NFC', icon: 'pi-mobile' },
   { label: 'Add Potential', icon: 'pi-plus-circle' },
   { label: 'Potential', icon: 'pi-chart-line' },
-  { label: 'Contacts', icon: 'pi-address-book' }
+  { label: 'Contacts', icon: 'pi-address-book' },
 ];
 
 /**
@@ -36,7 +36,7 @@ const UNAVAILABLE_ACTIONS: readonly { label: string; icon: string }[] = [
     </button>
     <p-menu #menu [model]="menuModel()" popup="true" appendTo="body" styleClass="w-60" />
   `,
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CustomerActionsMenuComponent {
   readonly customer = input.required<CustomerRecord>();
@@ -57,10 +57,10 @@ export class CustomerActionsMenuComponent {
           ...UNAVAILABLE_ACTIONS.map((action) => ({
             label: `${action.label} — not available in this assessment`,
             icon: action.icon,
-            disabled: true
-          }))
-        ]
-      }
+            disabled: true,
+          })),
+        ],
+      },
     ];
   });
 }

@@ -1,13 +1,7 @@
 export type SortDirection = 'asc' | 'desc';
 
 export type CustomerSortField =
-  | 'id'
-  | 'code'
-  | 'commercialName'
-  | 'email'
-  | 'mobile'
-  | 'city'
-  | 'country';
+  'id' | 'code' | 'commercialName' | 'email' | 'mobile' | 'city' | 'country';
 
 /** Categorical filters applied over the loaded collection (see README — API limitation). */
 export type CustomerFilterKey = 'clientTypeId' | 'accountManagerId' | 'cityId' | 'countryId';
@@ -36,7 +30,7 @@ export const EMPTY_CUSTOMER_FILTERS: CustomerFilters = {
   clientTypeId: null,
   accountManagerId: null,
   cityId: null,
-  countryId: null
+  countryId: null,
 };
 
 export function createEmptyCustomerQuery(): CustomerQuery {
@@ -47,7 +41,7 @@ export function createEmptyCustomerQuery(): CustomerQuery {
     page: 1,
     pageSize: 8,
     sortField: null,
-    sortDirection: 'asc'
+    sortDirection: 'asc',
   };
 }
 
@@ -56,7 +50,10 @@ export function createEmptyCustomerQuery(): CustomerQuery {
  * The backend exposes a single free-text parameter, therefore all free-text
  * filter terms are combined into one server-side search expression.
  */
-export function composeServerSearchText(search: string, textFilters: Partial<Record<CustomerTextFilterKey, string>>): string {
+export function composeServerSearchText(
+  search: string,
+  textFilters: Partial<Record<CustomerTextFilterKey, string>>,
+): string {
   const parts: string[] = [];
   if (search.trim()) {
     parts.push(search.trim());
@@ -89,7 +86,9 @@ export function isCustomerQueryEqual(a: CustomerQuery, b: CustomerQuery): boolea
   );
 }
 
-export function hasActiveTextFilters(filters: Partial<Record<CustomerTextFilterKey, string>>): boolean {
+export function hasActiveTextFilters(
+  filters: Partial<Record<CustomerTextFilterKey, string>>,
+): boolean {
   return Object.values(filters).some((value) => (value ?? '').trim().length > 0);
 }
 

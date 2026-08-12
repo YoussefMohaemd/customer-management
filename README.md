@@ -53,19 +53,19 @@ The UI intentionally replicates the supplied assessment screenshots: dark ERP si
 
 ## Features
 
-| Area | Detail |
-| --- | --- |
-| Data grid | PrimeNG table, compact enterprise styling, hover/loading/empty states |
-| Search | Server-side `Text` parameter, 400 ms debounce, request cancellation |
-| Filters | Free-text (server-side) + categorical (client-side over loaded set) with chips |
-| Pagination | Displayed page extracted from the loaded matching set; 100k+ safe |
-| Sorting | Any column, asc/desc, resets to page 1 |
-| Create / Edit | Shared reactive form, validation, `SaveCustomerWithContactPerson` |
-| Actions menu | View / Edit / Delete + disabled placeholders for unavailable modules |
-| Export | SheetJS Excel export of the current filtered + sorted result set |
-| Responsive | Sidebar collapse + mobile drawer, 4→2→1 column form grid |
-| Errors | Interceptor-normalized user-friendly messages for all HTTP statuses |
-| State | Angular Signals store, `computed()` derived state, `OnPush` rendering |
+| Area          | Detail                                                                         |
+| ------------- | ------------------------------------------------------------------------------ |
+| Data grid     | PrimeNG table, compact enterprise styling, hover/loading/empty states          |
+| Search        | Server-side `Text` parameter, 400 ms debounce, request cancellation            |
+| Filters       | Free-text (server-side) + categorical (client-side over loaded set) with chips |
+| Pagination    | Displayed page extracted from the loaded matching set; 100k+ safe              |
+| Sorting       | Any column, asc/desc, resets to page 1                                         |
+| Create / Edit | Shared reactive form, validation, `SaveCustomerWithContactPerson`              |
+| Actions menu  | View / Edit / Delete + disabled placeholders for unavailable modules           |
+| Export        | SheetJS Excel export of the current filtered + sorted result set               |
+| Responsive    | Sidebar collapse + mobile drawer, 4→2→1 column form grid                       |
+| Errors        | Interceptor-normalized user-friendly messages for all HTTP statuses            |
+| State         | Angular Signals store, `computed()` derived state, `OnPush` rendering          |
 
 ## Tech Stack
 
@@ -116,22 +116,22 @@ src/
 - **Feature-based, lazy-loaded**: `/customers` is a lazy route; the customer feature chunk is only fetched when the route is opened (verified in the build output as a separate lazy chunk).
 - **Strict separation of concerns**:
 
-  | Layer | Responsibility |
-  | --- | --- |
-  | `CustomerService` | Everything HTTP (endpoints, params, normalization). No UI state. |
-  | `CustomerStore` | Signal-based UI/query state + orchestration. No direct API calls into components. |
-  | Components | Presentational; consume signals, emit typed intents. |
-  | RxJS pipeline | Lives in `CustomerPageComponent` (debounce/cancel/serialization). |
+  | Layer             | Responsibility                                                                    |
+  | ----------------- | --------------------------------------------------------------------------------- |
+  | `CustomerService` | Everything HTTP (endpoints, params, normalization). No UI state.                  |
+  | `CustomerStore`   | Signal-based UI/query state + orchestration. No direct API calls into components. |
+  | Components        | Presentational; consume signals, emit typed intents.                              |
+  | RxJS pipeline     | Lives in `CustomerPageComponent` (debounce/cancel/serialization).                 |
 
 - **Dependency Injection** everywhere: `inject()`, `providedIn: 'root'` singletons, functional interceptors registered in `provideHttpClient(withInterceptors([...]))`.
 - **Powerful typing, no `any`**: strict TS (`strict: true`, `strictTemplates: true`), typed models, typed reactive form groups.
 
 ## API Integration
 
-| Operation | Endpoint |
-| --- | --- |
-| Read customers | `GET /api/CRM/ReadAllCRMClients?Text=&Direction=ltr&InCT=` |
-| Save (create/update) | `POST /api/CRM/SaveCustomerWithContactPerson?InCT=` |
+| Operation            | Endpoint                                                   |
+| -------------------- | ---------------------------------------------------------- |
+| Read customers       | `GET /api/CRM/ReadAllCRMClients?Text=&Direction=ltr&InCT=` |
+| Save (create/update) | `POST /api/CRM/SaveCustomerWithContactPerson?InCT=`        |
 
 - Base URL + endpoints live only in `src/environments/*` (swapped per build config via `fileReplacements`).
 - Response bodies are inspected and normalized at the model layer (`normalizeCustomerList`, `normalizeCustomerRecord`, `normalizeSaveCustomerResult`) so the UI depends on stable typed records, not on undocumented payload variants (e.g. the backend returns `CommercialName`/`CommericialName`/`Name` variants — normalization picks the first populated one).
@@ -217,17 +217,17 @@ Derived state is computed, never duplicated: `totalRecords`, `categoricalFiltere
 
 RxJS is used where it adds real value, and nowhere else:
 
-| Concern | Operators |
-| --- | --- |
-| Debounced search pipeline | `debounceTime` → `distinctUntilChanged` → `switchMap` |
-| Request cancellation of stale searches | `switchMap` |
-| Reload/retry pipeline | `subject$` + `switchMap` |
-| API errors in one place | `catchError` (interceptor) |
-| Loading/saving lifecycle flags | `finalize` |
-| Post-save refresh | `tap`/`map` to trigger one reload after success |
-| Subscriptions cleanup | `takeUntilDestroyed` |
+| Concern                                | Operators                                             |
+| -------------------------------------- | ----------------------------------------------------- |
+| Debounced search pipeline              | `debounceTime` → `distinctUntilChanged` → `switchMap` |
+| Request cancellation of stale searches | `switchMap`                                           |
+| Reload/retry pipeline                  | `subject$` + `switchMap`                              |
+| API errors in one place                | `catchError` (interceptor)                            |
+| Loading/saving lifecycle flags         | `finalize`                                            |
+| Post-save refresh                      | `tap`/`map` to trigger one reload after success       |
+| Subscriptions cleanup                  | `takeUntilDestroyed`                                  |
 
-Async *operations* (load, save) are exposed as Observables so callers can orchestrate/cancel them; all *state* consumption is signal-based.
+Async _operations_ (load, save) are exposed as Observables so callers can orchestrate/cancel them; all _state_ consumption is signal-based.
 
 ## Reactive Forms
 
@@ -289,12 +289,12 @@ npm start           # http://localhost:4200
 
 ## Environment Configuration
 
-| File | Purpose |
-| --- | --- |
-| `src/environments/environment.ts` | Dev default: API base URL, endpoints, `defaultPageSize`, `pageSizeOptions`, `searchDebounceMs`, `maxRecordsToLoad` |
-| `src/environments/environment.prod.ts` | Production values (replaced at build time) |
-| `public/config/app-config.json` | **Runtime, git-ignored** auth credentials |
-| `public/config/app-config.example.json` | Committed documentation of the config shape |
+| File                                    | Purpose                                                                                                            |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `src/environments/environment.ts`       | Dev default: API base URL, endpoints, `defaultPageSize`, `pageSizeOptions`, `searchDebounceMs`, `maxRecordsToLoad` |
+| `src/environments/environment.prod.ts`  | Production values (replaced at build time)                                                                         |
+| `public/config/app-config.json`         | **Runtime, git-ignored** auth credentials                                                                          |
+| `public/config/app-config.example.json` | Committed documentation of the config shape                                                                        |
 
 ## Build
 
@@ -325,7 +325,7 @@ These are **facts about the provided staging API**, not implementation shortcuts
 
 1. **No true server-side pagination** — `ReadAllCRMClients` returns the full matching collection; it has no page/pageSize/take parameters and no pagination metadata. Client-side pagination over the server-filtered set is therefore the only correct implementation.
 2. **No server-side sorting** — sorting is applied over the loaded matching set.
-3. **No categorical filter parameters** — Client Type / Account Manager / City / Country filters run over the loaded matching set. Free-text filters *are* served server-side via `Text`.
+3. **No categorical filter parameters** — Client Type / Account Manager / City / Country filters run over the loaded matching set. Free-text filters _are_ served server-side via `Text`.
 4. **No edit-specific endpoint** — the assessment provides only Read + Save; `SaveCustomerWithContactPerson` is contractually a save (create/update) call, so Edit reuses the same form and the same endpoint, preserving the customer `Id` in the payload. No fake update endpoint is invented.
 5. **No delete endpoint** — Delete shows an explicit confirmation that the action is unavailable in this assessment rather than simulating success.
 6. **No export endpoint** — Excel export covers the loaded matching set (see [Excel Export](#excel-export)).
@@ -333,14 +333,14 @@ These are **facts about the provided staging API**, not implementation shortcuts
 
 ## Architectural Decisions
 
-| Decision | Rationale |
-| --- | --- |
-| Signals store instead of NgRx | The task explicitly demands Angular Signals; a hand-rolled store with `computed()` covers derived state with far less boilerplate and no extra dependency. |
-| Interceptor for auth + errors | Keeps secrets handling and error mapping in exactly one place each; components never see raw HTTP failures. |
-| Runtime config for credentials | Secrets are never in source or commits; token injection is a deployment concern. |
-| Normalizers at the model layer | The backend payload shape is undocumented/irregular; normalization isolates that instability from the rest of the app. |
-| Lazy feature route | Loads only what the user visits; the module lines up with the 100k+ performance story. |
-| `OnPush` + signals everywhere | Rendering is driven exclusively by state changes; no zone-driven re-render storms in a big grid. |
-| Debounce/cancel pipeline in the page, not the store | The store stays synchronous and simple; async orchestration stays in one observable flow. |
-| Single shared customer form | Create/Edit/View share one form, one validation set, one payload mapper — zero duplicated form code. |
-| Plain `styles.css` + Tailwind v4 PostCSS | Avoids legacy Sass `@import` deprecation; Tailwind v4's PostCSS plugin is the current CLI-compatible approach. |
+| Decision                                            | Rationale                                                                                                                                                  |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Signals store instead of NgRx                       | The task explicitly demands Angular Signals; a hand-rolled store with `computed()` covers derived state with far less boilerplate and no extra dependency. |
+| Interceptor for auth + errors                       | Keeps secrets handling and error mapping in exactly one place each; components never see raw HTTP failures.                                                |
+| Runtime config for credentials                      | Secrets are never in source or commits; token injection is a deployment concern.                                                                           |
+| Normalizers at the model layer                      | The backend payload shape is undocumented/irregular; normalization isolates that instability from the rest of the app.                                     |
+| Lazy feature route                                  | Loads only what the user visits; the module lines up with the 100k+ performance story.                                                                     |
+| `OnPush` + signals everywhere                       | Rendering is driven exclusively by state changes; no zone-driven re-render storms in a big grid.                                                           |
+| Debounce/cancel pipeline in the page, not the store | The store stays synchronous and simple; async orchestration stays in one observable flow.                                                                  |
+| Single shared customer form                         | Create/Edit/View share one form, one validation set, one payload mapper — zero duplicated form code.                                                       |
+| Plain `styles.css` + Tailwind v4 PostCSS            | Avoids legacy Sass `@import` deprecation; Tailwind v4's PostCSS plugin is the current CLI-compatible approach.                                             |

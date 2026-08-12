@@ -10,16 +10,19 @@ export const routes: Routes = [
       {
         path: '',
         pathMatch: 'full',
-        redirectTo: 'customers'
+        redirectTo: 'customers',
       },
       {
         path: 'customers',
-        loadComponent: () => import('@features/customers/components/customer-page/customer-page.component').then((m) => m.CustomerPageComponent)
+        loadComponent: () =>
+          import('@features/customers/components/customer-page/customer-page.component').then(
+            (m) => m.CustomerPageComponent,
+          ),
       },
       {
         path: '**',
-        redirectTo: 'customers'
-      }
-    ]
-  }
+        redirectTo: 'customers',
+      },
+    ],
+  },
 ];

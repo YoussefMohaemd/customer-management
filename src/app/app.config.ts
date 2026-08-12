@@ -1,4 +1,9 @@
-import { ApplicationConfig, APP_INITIALIZER, provideBrowserGlobalErrorListeners, provideZoneChangeDetection } from '@angular/core';
+import {
+  ApplicationConfig,
+  APP_INITIALIZER,
+  provideBrowserGlobalErrorListeners,
+  provideZoneChangeDetection,
+} from '@angular/core';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { providePrimeNG } from 'primeng/config';
@@ -20,17 +25,17 @@ export const appConfig: ApplicationConfig = {
       theme: {
         preset: Aura,
         options: {
-          darkModeSelector: false
-        }
+          darkModeSelector: false,
+        },
       },
-      ripple: true
+      ripple: true,
     }),
     MessageService,
     ConfirmationService,
     {
       provide: APP_INITIALIZER,
       useFactory: appConfigInitializer,
-      multi: true
-    }
-  ]
+      multi: true,
+    },
+  ],
 };

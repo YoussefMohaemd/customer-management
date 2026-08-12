@@ -1,4 +1,9 @@
-import { HttpErrorResponse, HttpHandlerFn, HttpInterceptorFn, HttpRequest } from '@angular/common/http';
+import {
+  HttpErrorResponse,
+  HttpHandlerFn,
+  HttpInterceptorFn,
+  HttpRequest,
+} from '@angular/common/http';
 import { catchError, throwError } from 'rxjs';
 
 import { ApiError, toUserFriendlyMessage } from '@core/models/api-error';
@@ -8,10 +13,11 @@ import { ApiError, toUserFriendlyMessage } from '@core/models/api-error';
  * {@link ApiError} objects so that feature code never has to parse raw
  * backend errors or expose them directly in the UI.
  */
-export const apiErrorInterceptor: HttpInterceptorFn = (req: HttpRequest<unknown>, next: HttpHandlerFn) => {
-  return next(req).pipe(
-    catchError((error: unknown) => throwError(() => toApiError(error)))
-  );
+export const apiErrorInterceptor: HttpInterceptorFn = (
+  req: HttpRequest<unknown>,
+  next: HttpHandlerFn,
+) => {
+  return next(req).pipe(catchError((error: unknown) => throwError(() => toApiError(error))));
 };
 
 function toApiError(error: unknown): ApiError {
@@ -24,7 +30,7 @@ function toApiError(error: unknown): ApiError {
       status: error.status,
       statusText: error.statusText,
       url: error.url,
-      message: typeof error.error === 'string' ? error.error : undefined
+      message: typeof error.error === 'string' ? error.error : undefined,
     };
     return new ApiError(status, toUserFriendlyMessage(status), technical);
   }

@@ -6,15 +6,15 @@ import { environment } from '@environments/environment';
 import {
   CustomerPayload,
   CustomerRecord,
-  normalizeCustomerList
+  normalizeCustomerList,
 } from '@features/customers/models/customer.model';
 import {
   CustomerQuery,
-  composeServerSearchText
+  composeServerSearchText,
 } from '@features/customers/models/customer-query.model';
 import {
   SaveCustomerResult,
-  normalizeSaveCustomerResult
+  normalizeSaveCustomerResult,
 } from '@features/customers/models/customer-response.model';
 
 /**

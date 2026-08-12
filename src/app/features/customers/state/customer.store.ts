@@ -5,7 +5,7 @@ import { environment } from '@environments/environment';
 import {
   CustomerPayload,
   CustomerRecord,
-  createCustomerPayloadDefaults
+  createCustomerPayloadDefaults,
 } from '@features/customers/models/customer.model';
 import {
   CustomerFilters,
@@ -17,7 +17,7 @@ import {
   SortDirection,
   hasActiveCategoricalFilters,
   hasAnyFilter,
-  isCustomerQueryEqual
+  isCustomerQueryEqual,
 } from '@features/customers/models/customer-query.model';
 import { SaveCustomerResult } from '@features/customers/models/customer-response.model';
 import { CustomerService } from '@features/customers/services/customer.service';
@@ -78,7 +78,10 @@ export class CustomerStore {
       if (filters.clientTypeId !== null && record.accountTypeId !== filters.clientTypeId) {
         return false;
       }
-      if (filters.accountManagerId !== null && record.accountManagerId !== filters.accountManagerId) {
+      if (
+        filters.accountManagerId !== null &&
+        record.accountManagerId !== filters.accountManagerId
+      ) {
         return false;
       }
       if (filters.cityId !== null && record.cityId !== filters.cityId) {
@@ -101,12 +104,16 @@ export class CustomerStore {
     return [...this.categoricalFilteredRecords()].sort((a, b) => {
       const aValue = a[field];
       const bValue = b[field];
-      const comparison = String(aValue ?? '').localeCompare(String(bValue ?? ''), undefined, { sensitivity: 'base' });
+      const comparison = String(aValue ?? '').localeCompare(String(bValue ?? ''), undefined, {
+        sensitivity: 'base',
+      });
       return comparison === 0 ? a.id - b.id : comparison * multiplier;
     });
   });
 
-  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.sortedRecords().length / this.pageSize())));
+  readonly totalPages = computed(() =>
+    Math.max(1, Math.ceil(this.sortedRecords().length / this.pageSize())),
+  );
   readonly paginatedCustomers = computed<CustomerRecord[]>(() => {
     const start = (this.page() - 1) * this.pageSize();
     return this.sortedRecords().slice(start, start + this.pageSize());
@@ -118,7 +125,9 @@ export class CustomerStore {
     return Math.min(end, this.sortedRecords().length);
   });
   readonly hasRecords = computed(() => this.records().length > 0);
-  readonly isEmptyResult = computed(() => !this.loading() && !this.error() && this.records().length === 0);
+  readonly isEmptyResult = computed(
+    () => !this.loading() && !this.error() && this.records().length === 0,
+  );
   readonly hasServerSearch = computed(() => this.searchTerm().trim().length > 0);
   readonly hasFilters = computed(() => hasAnyFilter(this.currentQuery()));
   readonly totalFilterCount = computed(() => {
@@ -138,13 +147,29 @@ export class CustomerStore {
 
   // --- Lookup options for categorical filters (derived from real data) ------
   readonly clientTypeOptions = computed(() =>
-    distinctBy(this.records(), (r) => r.accountTypeId).map((r) => ({ value: r.accountTypeId, label: `Client Type ${r.accountTypeId}` }))
+    distinctBy(this.records(), (r) => r.accountTypeId).map((r) => ({
+      value: r.accountTypeId,
+      label: `Client Type ${r.accountTypeId}`,
+    })),
   );
   readonly accountManagerOptions = computed(() =>
-    distinctBy(this.records(), (r) => r.accountManagerId).map((r) => ({ value: r.accountManagerId, label: `Account Manager ${r.accountManagerId}` }))
+    distinctBy(this.records(), (r) => r.accountManagerId).map((r) => ({
+      value: r.accountManagerId,
+      label: `Account Manager ${r.accountManagerId}`,
+    })),
   );
-  readonly cityOptions = computed(() => distinctBy(this.records(), (r) => r.cityId).map((r) => ({ value: r.cityId, label: r.city || `City ${r.cityId}` })));
-  readonly countryOptions = computed(() => distinctBy(this.records(), (r) => r.countryId).map((r) => ({ value: r.countryId, label: r.country || `Country ${r.countryId}` })));
+  readonly cityOptions = computed(() =>
+    distinctBy(this.records(), (r) => r.cityId).map((r) => ({
+      value: r.cityId,
+      label: r.city || `City ${r.cityId}`,
+    })),
+  );
+  readonly countryOptions = computed(() =>
+    distinctBy(this.records(), (r) => r.countryId).map((r) => ({
+      value: r.countryId,
+      label: r.country || `Country ${r.countryId}`,
+    })),
+  );
 
   // --- Query assembly -------------------------------------------------------
   private currentQuery(): CustomerQuery {
@@ -155,7 +180,7 @@ export class CustomerStore {
       page: this.page(),
       pageSize: this.pageSize(),
       sortField: this.sortField(),
-      sortDirection: this.sortDirection()
+      sortDirection: this.sortDirection(),
     };
   }
 
@@ -186,7 +211,7 @@ export class CustomerStore {
           this.loadWarning.set(
             `The server returned ${records.length.toLocaleString()} matching records. ` +
               `For safety this app caps the loaded set at ${environment.customers.maxRecordsToLoad.toLocaleString()} — ` +
-              `narrow your search to work with a smaller set.`
+              `narrow your search to work with a smaller set.`,
           );
           this.records.set(records.slice(0, environment.customers.maxRecordsToLoad));
         }
@@ -196,7 +221,7 @@ export class CustomerStore {
         this.error.set(messageFrom(error));
         return throwError(() => error);
       }),
-      finalize(() => this.loading.set(false))
+      finalize(() => this.loading.set(false)),
     );
   }
 
@@ -329,11 +354,11 @@ export class CustomerStore {
         if (result.success) {
           this.lastExecutedQuery = null;
           void this.loadCustomers().subscribe({
-            error: () => undefined
+            error: () => undefined,
           });
         }
         return result;
-      })
+      }),
     );
   }
 

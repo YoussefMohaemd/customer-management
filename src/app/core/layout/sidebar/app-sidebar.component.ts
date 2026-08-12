@@ -16,7 +16,10 @@ import { SIDEBAR_NAV_ITEMS } from '@core/config/navigation';
       [attr.aria-label]="'Main navigation'"
     >
       <!-- Brand -->
-      <div class="flex h-16 shrink-0 items-center gap-3 border-b border-slate-800 px-5" [class.justify-center]="collapsed()">
+      <div
+        class="flex h-16 shrink-0 items-center gap-3 border-b border-slate-800 px-5"
+        [class.justify-center]="collapsed()"
+      >
         <div
           class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-900/40"
           [attr.aria-hidden]="true"
@@ -64,7 +67,8 @@ import { SIDEBAR_NAV_ITEMS } from '@core/config/navigation';
                 @if (item.badge) {
                   <span
                     class="ml-auto rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold text-white"
-                  >{{ item.badge }}</span>
+                    >{{ item.badge }}</span
+                  >
                 }
               </a>
             </li>
@@ -81,7 +85,7 @@ import { SIDEBAR_NAV_ITEMS } from '@core/config/navigation';
       </div>
     </aside>
   `,
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppSidebarComponent {
   readonly collapsed = input(false);
@@ -106,7 +110,7 @@ export class AppSidebarComponent {
         severity: 'info',
         summary: 'Module unavailable',
         detail: `${item.label} is not part of this technical assessment.`,
-        life: 2600
+        life: 2600,
       });
     }
   }

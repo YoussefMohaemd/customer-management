@@ -214,7 +214,7 @@ export function createCustomerPayloadDefaults(): CustomerPayload {
     xmlContactPersonGrid: [],
     Attachment: [],
     ServerIP: '',
-    InCT: ''
+    InCT: '',
   };
 }
 
@@ -279,7 +279,13 @@ export function normalizeCustomerRecord(raw: unknown): CustomerRecord | null {
   return {
     id: readNumber(pick(record, ['Id', 'id', 'ID'])),
     code: pick(record, ['Code', 'code']),
-    commercialName: pick(record, ['CommercialName', 'CommericialName', 'Name', 'NameEN', 'commercialName']),
+    commercialName: pick(record, [
+      'CommercialName',
+      'CommericialName',
+      'Name',
+      'NameEN',
+      'commercialName',
+    ]),
     nameEn: pick(record, ['NameEN', 'NameEn', 'nameEN', 'EnglishName']),
     nameAr: pick(record, ['NameAR', 'NameAr', 'nameAR', 'ArabicName']),
     mobile: pick(record, ['Mobile', 'mobile', 'ContMobile']),
@@ -304,24 +310,46 @@ export function normalizeCustomerRecord(raw: unknown): CustomerRecord | null {
     gender: readNullableString(pick(record, ['Gender', 'gender'])),
     comment: pick(record, ['Comment', 'comment']),
     taxFileNumber: pick(record, ['TaxFileNumber', 'taxFileNumber']),
-    commercialRegistrationNumber: pick(record, ['CommercialRegistrationNumber', 'commercialRegistrationNumber']),
-    vatRegistrationNumber: pick(record, ['VATRegistrationNumber', 'vatRegistrationNumber'])
+    commercialRegistrationNumber: pick(record, [
+      'CommercialRegistrationNumber',
+      'commercialRegistrationNumber',
+    ]),
+    vatRegistrationNumber: pick(record, ['VATRegistrationNumber', 'vatRegistrationNumber']),
   };
 }
 
 /** Extracts the customer collection from raw payloads (array or common wrapper shapes). */
 export function normalizeCustomerList(raw: unknown): CustomerRecord[] {
   if (Array.isArray(raw)) {
-    return raw.map((item) => normalizeCustomerRecord(item)).filter((item): item is CustomerRecord => item !== null);
+    return raw
+      .map((item) => normalizeCustomerRecord(item))
+      .filter((item): item is CustomerRecord => item !== null);
   }
   if (typeof raw !== 'object' || raw === null) {
     return [];
   }
   const container = raw as Record<string, unknown>;
-  for (const key of ['Data', 'data', 'Items', 'items', 'Result', 'result', 'List', 'list', 'Value', 'value', 'Customers', 'customers', 'Clients', 'clients']) {
+  for (const key of [
+    'Data',
+    'data',
+    'Items',
+    'items',
+    'Result',
+    'result',
+    'List',
+    'list',
+    'Value',
+    'value',
+    'Customers',
+    'customers',
+    'Clients',
+    'clients',
+  ]) {
     const candidate = container[key];
     if (Array.isArray(candidate)) {
-      return candidate.map((item) => normalizeCustomerRecord(item)).filter((item): item is CustomerRecord => item !== null);
+      return candidate
+        .map((item) => normalizeCustomerRecord(item))
+        .filter((item): item is CustomerRecord => item !== null);
     }
   }
   return [];

@@ -9,7 +9,14 @@ import { InputIconModule } from 'primeng/inputicon';
 
 @Component({
   selector: 'app-topbar',
-  imports: [FormsModule, SelectModule, TooltipModule, ButtonModule, IconFieldModule, InputIconModule],
+  imports: [
+    FormsModule,
+    SelectModule,
+    TooltipModule,
+    ButtonModule,
+    IconFieldModule,
+    InputIconModule,
+  ],
   template: `
     <header
       class="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-4 sm:px-6"
@@ -37,7 +44,10 @@ import { InputIconModule } from 'primeng/inputicon';
       <!-- Global command / search area -->
       <div class="mx-auto hidden w-full max-w-md lg:block">
         <div class="relative">
-          <i class="pi pi-search pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400" aria-hidden="true"></i>
+          <i
+            class="pi pi-search pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400"
+            aria-hidden="true"
+          ></i>
           <input
             type="search"
             placeholder="Search anything…  ( / )"
@@ -102,12 +112,15 @@ import { InputIconModule } from 'primeng/inputicon';
           >
             YA
           </div>
-          <i class="pi pi-angle-down hidden text-[10px] text-slate-400 sm:block" aria-hidden="true"></i>
+          <i
+            class="pi pi-angle-down hidden text-[10px] text-slate-400 sm:block"
+            aria-hidden="true"
+          ></i>
         </button>
       </div>
     </header>
   `,
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppTopbarComponent {
   readonly menuToggle = output<void>();
@@ -116,7 +129,7 @@ export class AppTopbarComponent {
 
   protected readonly languages = computed(() => [
     { label: 'English', value: 'en' },
-    { label: 'العربية', value: 'ar' }
+    { label: 'العربية', value: 'ar' },
   ]);
   protected selectedLanguage = 'en';
 
@@ -125,7 +138,7 @@ export class AppTopbarComponent {
       severity: 'info',
       summary: 'Notifications',
       detail: 'You are up to date. No new notifications.',
-      life: 2500
+      life: 2500,
     });
   }
 }

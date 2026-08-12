@@ -7,7 +7,10 @@ import { SelectModule } from 'primeng/select';
 import { BadgeModule } from 'primeng/badge';
 import { PrimeTemplate } from 'primeng/api';
 
-import { CustomerTextFilterKey, CustomerFilterKey } from '@features/customers/models/customer-query.model';
+import {
+  CustomerTextFilterKey,
+  CustomerFilterKey,
+} from '@features/customers/models/customer-query.model';
 import { CustomerStore } from '@features/customers/state/customer.store';
 
 /**
@@ -21,7 +24,15 @@ import { CustomerStore } from '@features/customers/state/customer.store';
  */
 @Component({
   selector: 'app-customer-filters',
-  imports: [FormsModule, ButtonModule, InputTextModule, PopoverModule, SelectModule, BadgeModule, PrimeTemplate],
+  imports: [
+    FormsModule,
+    ButtonModule,
+    InputTextModule,
+    PopoverModule,
+    SelectModule,
+    BadgeModule,
+    PrimeTemplate,
+  ],
   template: `
     <button
       #filterButton
@@ -44,7 +55,13 @@ import { CustomerStore } from '@features/customers/state/customer.store';
       }
     </button>
 
-    <p-popover #popover [dismissable]="true" appendTo="body" (onShow)="onPanelOpen()" (onHide)="onPanelClose()">
+    <p-popover
+      #popover
+      [dismissable]="true"
+      appendTo="body"
+      (onShow)="onPanelOpen()"
+      (onHide)="onPanelClose()"
+    >
       <ng-template pTemplate="content">
         <div class="w-[320px] sm:w-[380px]">
           <div class="border-b border-slate-200 px-4 py-3">
@@ -60,30 +77,67 @@ import { CustomerStore } from '@features/customers/state/customer.store';
               </button>
             </div>
             <p class="mt-0.5 text-[11px] leading-4 text-slate-400">
-              Text filters are sent to the server. Categorical filters apply to the loaded result set.
+              Text filters are sent to the server. Categorical filters apply to the loaded result
+              set.
             </p>
           </div>
 
           <div class="grid grid-cols-2 gap-3 px-4 py-4">
             <label class="flex flex-col gap-1 text-xs font-medium text-slate-600">
               ID
-              <input pInputText type="number" inputmode="numeric" [(ngModel)]="values.id" (ngModelChange)="onTextFilterChange('id', $event)" placeholder="e.g. 1024" class="w-full" />
+              <input
+                pInputText
+                type="number"
+                inputmode="numeric"
+                [(ngModel)]="values.id"
+                (ngModelChange)="onTextFilterChange('id', $event)"
+                placeholder="e.g. 1024"
+                class="w-full"
+              />
             </label>
             <label class="flex flex-col gap-1 text-xs font-medium text-slate-600">
               Code
-              <input pInputText type="text" [(ngModel)]="values.code" (ngModelChange)="onTextFilterChange('code', $event)" placeholder="CUST-001" class="w-full" />
+              <input
+                pInputText
+                type="text"
+                [(ngModel)]="values.code"
+                (ngModelChange)="onTextFilterChange('code', $event)"
+                placeholder="CUST-001"
+                class="w-full"
+              />
             </label>
             <label class="flex flex-col gap-1 text-xs font-medium text-slate-600">
               Name
-              <input pInputText type="text" [(ngModel)]="values.name" (ngModelChange)="onTextFilterChange('name', $event)" placeholder="Customer name" class="w-full" />
+              <input
+                pInputText
+                type="text"
+                [(ngModel)]="values.name"
+                (ngModelChange)="onTextFilterChange('name', $event)"
+                placeholder="Customer name"
+                class="w-full"
+              />
             </label>
             <label class="flex flex-col gap-1 text-xs font-medium text-slate-600">
               Email
-              <input pInputText type="email" [(ngModel)]="values.email" (ngModelChange)="onTextFilterChange('email', $event)" placeholder="name@company.com" class="w-full" />
+              <input
+                pInputText
+                type="email"
+                [(ngModel)]="values.email"
+                (ngModelChange)="onTextFilterChange('email', $event)"
+                placeholder="name@company.com"
+                class="w-full"
+              />
             </label>
             <label class="col-span-2 flex flex-col gap-1 text-xs font-medium text-slate-600">
               Mobile
-              <input pInputText type="tel" [(ngModel)]="values.mobile" (ngModelChange)="onTextFilterChange('mobile', $event)" placeholder="+20 1xx xxx xxxx" class="w-full" />
+              <input
+                pInputText
+                type="tel"
+                [(ngModel)]="values.mobile"
+                (ngModelChange)="onTextFilterChange('mobile', $event)"
+                placeholder="+20 1xx xxx xxxx"
+                class="w-full"
+              />
             </label>
 
             <label class="flex flex-col gap-1 text-xs font-medium text-slate-600">
@@ -143,14 +197,15 @@ import { CustomerStore } from '@features/customers/state/customer.store';
       </ng-template>
     </p-popover>
   `,
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CustomerFiltersComponent {
   protected readonly store = inject(CustomerStore);
 
   protected popoverOpen = false;
 
-  protected readonly values: Partial<Record<CustomerTextFilterKey, string>> & Partial<Record<CustomerFilterKey, number>> = {};
+  protected readonly values: Partial<Record<CustomerTextFilterKey, string>> &
+    Partial<Record<CustomerFilterKey, number>> = {};
 
   protected onPanelOpen(): void {
     this.popoverOpen = true;
@@ -161,11 +216,17 @@ export class CustomerFiltersComponent {
     this.popoverOpen = false;
   }
 
-  protected onTextFilterChange(key: CustomerTextFilterKey, value: string | number | null | undefined): void {
+  protected onTextFilterChange(
+    key: CustomerTextFilterKey,
+    value: string | number | null | undefined,
+  ): void {
     this.store.setTextFilter(key, value === null || value === undefined ? '' : String(value));
   }
 
-  protected onCategoricalFilterChange(key: CustomerFilterKey, value: number | null | undefined): void {
+  protected onCategoricalFilterChange(
+    key: CustomerFilterKey,
+    value: number | null | undefined,
+  ): void {
     this.store.setCategoricalFilter(key, value ?? null);
   }
 

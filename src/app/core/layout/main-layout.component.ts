@@ -35,7 +35,7 @@ import { AppTopbarComponent } from '@core/layout/topbar/app-topbar.component';
       </div>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MainLayoutComponent {
   protected readonly desktopCollapsed = signal(false);

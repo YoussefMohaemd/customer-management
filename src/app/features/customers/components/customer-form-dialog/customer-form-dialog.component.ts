@@ -6,13 +6,13 @@ import { CustomerPayload } from '@features/customers/models/customer.model';
 import { CustomerStore } from '@features/customers/state/customer.store';
 import {
   CustomerFormComponent,
-  CustomerFormMode
+  CustomerFormMode,
 } from '@features/customers/components/customer-form/customer-form.component';
 
 const DIALOG_TITLES: Record<CustomerFormMode, string> = {
   create: 'Add Customer',
   edit: 'Edit Customer',
-  view: 'View Customer'
+  view: 'View Customer',
 };
 
 /**
@@ -63,7 +63,7 @@ const DIALOG_TITLES: Record<CustomerFormMode, string> = {
       />
     </p-dialog>
   `,
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CustomerFormDialogComponent {
   protected readonly store = inject(CustomerStore);
@@ -95,17 +95,28 @@ export class CustomerFormDialogComponent {
   }
 
   protected onSaved(payload: CustomerPayload): void {
-    const successMessage = this.mode === 'create' ? 'Customer created successfully.' : 'Customer updated successfully.';
+    const successMessage =
+      this.mode === 'create' ? 'Customer created successfully.' : 'Customer updated successfully.';
     this.store.saveCustomer(payload).subscribe({
       next: (result) => {
         if (result.success) {
-          this.messageService.add({ severity: 'success', summary: 'Saved', detail: result.message || successMessage, life: 3000 });
+          this.messageService.add({
+            severity: 'success',
+            summary: 'Saved',
+            detail: result.message || successMessage,
+            life: 3000,
+          });
           this.store.closeForm();
         } else {
-          this.messageService.add({ severity: 'error', summary: 'Save failed', detail: result.message, life: 4500 });
+          this.messageService.add({
+            severity: 'error',
+            summary: 'Save failed',
+            detail: result.message,
+            life: 4500,
+          });
         }
       },
-      error: () => undefined
+      error: () => undefined,
     });
   }
 }

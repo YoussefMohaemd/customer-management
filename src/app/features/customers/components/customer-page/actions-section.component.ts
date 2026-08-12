@@ -13,26 +13,26 @@ const ACTION_CARDS: readonly ActionCard[] = [
     icon: 'pi-share-alt',
     title: 'Collective Reassign',
     description: 'Reassign selected customers to another account manager in one operation.',
-    accent: 'blue'
+    accent: 'blue',
   },
   {
     icon: 'pi-phone',
     title: 'Customer Follow Up',
     description: 'Schedule and manage follow-up calls and meeting reminders for your accounts.',
-    accent: 'amber'
+    accent: 'amber',
   },
   {
     icon: 'pi-cloud-upload',
     title: 'Upload Bulk',
     description: 'Import multiple customers at once from an Excel or CSV spreadsheet file.',
-    accent: 'emerald'
-  }
+    accent: 'emerald',
+  },
 ];
 
 const ACCENT_STYLES: Record<ActionCard['accent'], string> = {
   blue: 'bg-blue-50 text-blue-600',
   amber: 'bg-amber-50 text-amber-600',
-  emerald: 'bg-emerald-50 text-emerald-600'
+  emerald: 'bg-emerald-50 text-emerald-600',
 };
 
 /** Presentational "Actions" strip matching the assessment reference. */
@@ -56,7 +56,10 @@ const ACCENT_STYLES: Record<ActionCard['accent'], string> = {
           <div class="min-w-0">
             <div class="flex items-center gap-2 text-sm font-semibold text-slate-800">
               {{ card.title }}
-              <i class="pi pi-arrow-up-right text-xs text-slate-300 transition group-hover:text-blue-500" aria-hidden="true"></i>
+              <i
+                class="pi pi-arrow-up-right text-xs text-slate-300 transition group-hover:text-blue-500"
+                aria-hidden="true"
+              ></i>
             </div>
             <p class="mt-1 text-xs leading-5 text-slate-400">{{ card.description }}</p>
           </div>
@@ -64,7 +67,7 @@ const ACCENT_STYLES: Record<ActionCard['accent'], string> = {
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ActionsSectionComponent {
   protected readonly cards = ACTION_CARDS;
@@ -79,7 +82,7 @@ export class ActionsSectionComponent {
       severity: 'info',
       summary: title,
       detail: 'This module is not part of the provided API assessment.',
-      life: 2500
+      life: 2500,
     });
   }
 }

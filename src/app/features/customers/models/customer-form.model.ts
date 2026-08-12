@@ -1,7 +1,7 @@
 import {
   CustomerContactPerson,
   CustomerPayload,
-  createCustomerPayloadDefaults
+  createCustomerPayloadDefaults,
 } from '@features/customers/models/customer.model';
 
 /**
@@ -88,7 +88,7 @@ export function emptyCustomerFormValues(): CustomerFormValues {
     contAddress: '',
     contMobile: '',
     contEmail: '',
-    contPhone: ''
+    contPhone: '',
   };
 }
 
@@ -98,7 +98,7 @@ const CONTACT_PERSON_FIELDS: readonly (keyof CustomerFormValues)[] = [
   'contAddress',
   'contMobile',
   'contEmail',
-  'contPhone'
+  'contPhone',
 ] as const;
 
 /**
@@ -150,7 +150,9 @@ export function toCustomerPayload(values: CustomerFormValues, existingId: number
   payload.ContEmail = values.contEmail.trim();
   payload.ContPhone = values.contPhone.trim();
 
-  const hasContactPerson = CONTACT_PERSON_FIELDS.some((field) => String(values[field]).trim() !== '');
+  const hasContactPerson = CONTACT_PERSON_FIELDS.some(
+    (field) => String(values[field]).trim() !== '',
+  );
   if (hasContactPerson) {
     payload.xmlContactPersonGrid = [buildContactPersonRow(values)];
   }

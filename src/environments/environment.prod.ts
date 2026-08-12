@@ -7,14 +7,14 @@ export const environment: Environment = {
     crmPath: '/api/CRM',
     endpoints: {
       readAllCrmClients: '/api/CRM/ReadAllCRMClients',
-      saveCustomerWithContactPerson: '/api/CRM/SaveCustomerWithContactPerson'
+      saveCustomerWithContactPerson: '/api/CRM/SaveCustomerWithContactPerson',
     },
-    direction: 'ltr'
+    direction: 'ltr',
   },
   customers: {
     defaultPageSize: 8,
     pageSizeOptions: [5, 8, 10, 20, 50],
     searchDebounceMs: 400,
-    maxRecordsToLoad: 50000
-  }
+    maxRecordsToLoad: 50000,
+  },
 };
