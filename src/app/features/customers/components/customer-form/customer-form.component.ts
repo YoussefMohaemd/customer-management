@@ -53,141 +53,8 @@ interface Section {
     ButtonModule,
     DividerModule,
   ],
-  template: `
-    <form [formGroup]="form" class="flex flex-col" (ngSubmit)="submit()" novalidate>
-      <!-- Error summary -->
-      @if (store.saveError()) {
-        <div
-          class="mb-4 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-          role="alert"
-        >
-          <i class="pi pi-exclamation-circle mt-0.5" aria-hidden="true"></i>
-          <div>
-            <div class="font-semibold">Save failed</div>
-            <div class="text-red-600">{{ store.saveError() }}</div>
-          </div>
-        </div>
-      }
-
-      @for (section of sections; track section.title) {
-        <div class="mb-6 last:mb-0">
-          <div class="mb-3 flex items-center gap-2">
-            <div
-              class="flex h-7 w-7 items-center justify-center rounded-md bg-blue-50 text-blue-600"
-              aria-hidden="true"
-            >
-              <i [class]="section.icon" class="pi text-xs"></i>
-            </div>
-            <h3 class="text-sm font-bold text-slate-800">{{ section.title }}</h3>
-            <div class="ml-2 h-px flex-1 bg-slate-100"></div>
-          </div>
-
-          <div class="grid grid-cols-1 gap-x-4 gap-y-4 md:grid-cols-2 xl:grid-cols-4">
-            @for (field of section.fields; track field.label) {
-              <div [class]="field.span ?? ''">
-                <label
-                  [for]="'customer-' + field.control"
-                  class="mb-1 block text-xs font-semibold text-slate-600"
-                >
-                  {{ field.label }}
-                  @if (isRequired(field.control)) {
-                    <span class="text-red-500" aria-hidden="true">*</span>
-                    <span class="sr-only">(required)</span>
-                  }
-                </label>
-                @switch (inputKind(field.control)) {
-                  @case ('date') {
-                    <p-datepicker
-                      [id]="'customer-' + field.control"
-                      formControlName="{{ field.control }}"
-                      dateFormat="dd/mm/yy"
-                      [showIcon]="true"
-                      [iconDisplay]="'input'"
-                      [showButtonBar]="true"
-                      [readonlyInput]="true"
-                      [maxDate]="today"
-                      styleClass="w-full"
-                      [disabled]="isViewMode()"
-                    />
-                  }
-                  @case ('select') {
-                    <p-select
-                      [id]="'customer-' + field.control"
-                      formControlName="{{ field.control }}"
-                      [options]="store.accountManagerOptions()"
-                      optionLabel="label"
-                      optionValue="value"
-                      placeholder="Select account manager"
-                      [showClear]="true"
-                      class="w-full"
-                      [disabled]="isViewMode()"
-                    />
-                  }
-                  @case ('textarea') {
-                    <textarea
-                      pTextarea
-                      [id]="'customer-' + field.control"
-                      formControlName="{{ field.control }}"
-                      rows="2"
-                      class="w-full resize-none"
-                      [readonly]="isViewMode()"
-                    ></textarea>
-                  }
-                  @default {
-                    <input
-                      pInputText
-                      [id]="'customer-' + field.control"
-                      formControlName="{{ field.control }}"
-                      [class.p-invalid]="isInvalid(field.control)"
-                      class="w-full"
-                      [readonly]="isViewMode()"
-                      [type]="inputType(field.control)"
-                    />
-                  }
-                }
-                @if (isInvalid(field.control)) {
-                  <small class="mt-1 block text-xs text-red-500">{{
-                    errorMessage(field.control)
-                  }}</small>
-                }
-              </div>
-            }
-          </div>
-        </div>
-      }
-
-      <!-- Footer actions -->
-      <div class="flex items-center justify-end gap-2 border-t border-slate-200 pt-4">
-        @if (!isViewMode()) {
-          <span class="mr-auto text-xs text-slate-400">* Required fields</span>
-        }
-        <p-button label="Cancel" [text]="true" severity="secondary" (onClick)="cancelled.emit()" />
-        @switch (mode()) {
-          @case ('create') {
-            <p-button
-              label="Save Customer"
-              icon="pi pi-check"
-              [loading]="store.saving()"
-              [disabled]="store.saving()"
-              (onClick)="submit()"
-            />
-          }
-          @case ('edit') {
-            <p-button
-              label="Update Customer"
-              icon="pi pi-check"
-              [loading]="store.saving()"
-              [disabled]="store.saving()"
-              (onClick)="submit()"
-            />
-          }
-          @case ('view') {
-            <p-button label="Close" (onClick)="cancelled.emit()" />
-          }
-        }
-      </div>
-    </form>
-  `,
+  templateUrl: './customer-form.component.html',
+  styleUrl: './customer-form.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CustomerFormComponent {
@@ -392,9 +259,6 @@ export class CustomerFormComponent {
     }
     if (control === 'website') {
       return 'url';
-    }
-    if (control === 'nationalId') {
-      return 'text';
     }
     return 'text';
   }

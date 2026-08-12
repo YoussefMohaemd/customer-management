@@ -1,7 +1,10 @@
 /**
- * Normalized customer record as displayed by the Read API.
- * Field names are normalized (the backend returns several variants such as
- * `CommericialName` / `CommercialName` / `Name`) via `normalizeCustomerRecord`.
+ * Normalized customer record as returned by `ReadAllCRMClients`.
+ *
+ * The staging API returns `{ "Data": Client[], "Total": number }` where
+ * `Client` objects carry both id and display fields (`AccountTypeName`,
+ * `AccountManagerName`, `CountryName`, `CityName`, ...). Ids of `0` mean
+ * "not set" for reference dimensions and are therefore normalized to `null`.
  */
 export interface CustomerRecord {
   id: number;
@@ -22,17 +25,30 @@ export interface CustomerRecord {
   country: string;
   countryId: number | null;
   accountTypeId: number | null;
+  accountTypeName: string;
+  clientType: string;
   accountManagerId: number | null;
+  accountManagerName: string;
   classificationId: number | null;
+  classificationName: string;
   businessFieldId: number | null;
+  businessFieldName: string;
+  regionName: string;
   birthDate: string | null;
   registrationDate: string | null;
+  createdDate: string | null;
   status: string | null;
   gender: string | null;
   comment: string;
   taxFileNumber: string;
   commercialRegistrationNumber: string;
   vatRegistrationNumber: string;
+}
+
+/** Result of parsing a `ReadAllCRMClients` response body. */
+export interface CustomerListResult {
+  records: CustomerRecord[];
+  total: number;
 }
 
 /** A single row of the `xmlContactPersonGrid` collection sent to the Save API. */
@@ -219,8 +235,31 @@ export function createCustomerPayloadDefaults(): CustomerPayload {
 }
 
 // ---------------------------------------------------------------------------
-// Normalization helpers (the Read API payload shape is not strongly documented)
+// Normalization helpers
 // ---------------------------------------------------------------------------
+
+/** Keys preferentially used to locate the customer collection in raw payloads. */
+const COLLECTION_KEYS: readonly string[] = [
+  'Data',
+  'data',
+  'Records',
+  'records',
+  'Items',
+  'items',
+  'Result',
+  'result',
+  'List',
+  'list',
+  'Value',
+  'value',
+  'Payload',
+  'payload',
+  'Customers',
+  'customers',
+  'Clients',
+  'clients',
+  'd',
+] as const;
 
 function readString(value: unknown, fallback = ''): string {
   if (value === null || value === undefined) {
@@ -234,12 +273,13 @@ function readNumber(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function readNullableNumber(value: unknown): number | null {
+/** Reference ids of `0` are treated as "not set" by the CRM API. */
+function readId(value: unknown): number | null {
   if (value === null || value === undefined || value === '') {
     return null;
   }
   const parsed = typeof value === 'number' ? value : Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 function readNullableString(value: unknown): string | null {
@@ -288,24 +328,37 @@ export function normalizeCustomerRecord(raw: unknown): CustomerRecord | null {
     ]),
     nameEn: pick(record, ['NameEN', 'NameEn', 'nameEN', 'EnglishName']),
     nameAr: pick(record, ['NameAR', 'NameAr', 'nameAR', 'ArabicName']),
-    mobile: pick(record, ['Mobile', 'mobile', 'ContMobile']),
-    phone: pick(record, ['Phone', 'phone', 'ContPhone']),
+    mobile: pick(record, [
+      'MobileWithPrefix',
+      'mobileWithPrefix',
+      'Mobile',
+      'mobile',
+      'ContMobile',
+    ]),
+    phone: pick(record, ['PhoneWithPrefix', 'phoneWithPrefix', 'Phone', 'phone', 'ContPhone']),
     phone2: pick(record, ['Phone2', 'phone2', 'ContPhone']),
     fax: pick(record, ['Fax', 'fax', 'ContFax']),
     email: pick(record, ['Email', 'email', 'ContEmail']),
     website: pick(record, ['Website', 'website']),
-    jobTitle: pick(record, ['JobTitle', 'jobTitle']),
+    jobTitle: pick(record, ['JobTitle', 'jobTitle', 'Employment']),
     address: pick(record, ['Address', 'address', 'ContAddress']),
-    city: pick(record, ['City', 'city']),
-    cityId: readNullableNumber(pick(record, ['CityId', 'cityId'])),
-    country: pick(record, ['Country', 'country']),
-    countryId: readNullableNumber(pick(record, ['CountryId', 'countryId'])),
-    accountTypeId: readNullableNumber(pick(record, ['AccountTypeId', 'accountTypeId'])),
-    accountManagerId: readNullableNumber(pick(record, ['AccountManagerId', 'accountManagerId'])),
-    classificationId: readNullableNumber(pick(record, ['ClassificationId', 'classificationId'])),
-    businessFieldId: readNullableNumber(pick(record, ['BusinessFieldId', 'businessFieldId'])),
+    city: pick(record, ['CityName', 'cityName', 'City', 'city']),
+    cityId: readId(pick(record, ['CityId', 'cityId'])),
+    country: pick(record, ['CountryName', 'countryName', 'Country', 'country']),
+    countryId: readId(pick(record, ['CountryId', 'countryId'])),
+    accountTypeId: readId(pick(record, ['AccountTypeId', 'accountTypeId'])),
+    accountTypeName: pick(record, ['AccountTypeName', 'accountTypeName']),
+    clientType: pick(record, ['ClientType', 'clientType']),
+    accountManagerId: readId(pick(record, ['AccountManagerId', 'accountManagerId'])),
+    accountManagerName: pick(record, ['AccountManagerName', 'accountManagerName']),
+    classificationId: readId(pick(record, ['ClassificationId', 'classificationId'])),
+    classificationName: pick(record, ['ClassificationNam', 'ClassificationName', 'classificationName']),
+    businessFieldId: readId(pick(record, ['BusinessFieldId', 'businessFieldId'])),
+    businessFieldName: pick(record, ['BusinessFieldName', 'businessFieldName']),
+    regionName: pick(record, ['RegionName', 'regionName']),
     birthDate: readDate(pick(record, ['BirthDate', 'birthDate'])),
     registrationDate: readDate(pick(record, ['RegistrationDate', 'registrationDate'])),
+    createdDate: readDate(pick(record, ['CreatedDate', 'createdDate'])),
     status: readNullableString(pick(record, ['Status', 'status'])),
     gender: readNullableString(pick(record, ['Gender', 'gender'])),
     comment: pick(record, ['Comment', 'comment']),
@@ -318,39 +371,56 @@ export function normalizeCustomerRecord(raw: unknown): CustomerRecord | null {
   };
 }
 
-/** Extracts the customer collection from raw payloads (array or common wrapper shapes). */
-export function normalizeCustomerList(raw: unknown): CustomerRecord[] {
+/**
+ * Extracts the customer collection from a raw `ReadAllCRMClients` body.
+ *
+ * Verified contract: `{ "Data": Client[], "Total": number }`. The runtime
+ * parser additionally tolerates top-level arrays and common wrapper shapes
+ * (including `Result: { Data: [...] }` and ASP.NET `d` envelopes) so the
+ * UI keeps working if the staging payload shape changes.
+ */
+export function normalizeCustomerList(raw: unknown): CustomerListResult {
   if (Array.isArray(raw)) {
-    return raw
-      .map((item) => normalizeCustomerRecord(item))
-      .filter((item): item is CustomerRecord => item !== null);
+    return { records: normalizeArray(raw), total: raw.length };
   }
   if (typeof raw !== 'object' || raw === null) {
-    return [];
+    return { records: [], total: 0 };
   }
+
   const container = raw as Record<string, unknown>;
-  for (const key of [
-    'Data',
-    'data',
-    'Items',
-    'items',
-    'Result',
-    'result',
-    'List',
-    'list',
-    'Value',
-    'value',
-    'Customers',
-    'customers',
-    'Clients',
-    'clients',
-  ]) {
+  const total = readNumber(container['Total'] ?? container['total'] ?? 0);
+
+  for (const key of COLLECTION_KEYS) {
     const candidate = container[key];
     if (Array.isArray(candidate)) {
-      return candidate
-        .map((item) => normalizeCustomerRecord(item))
-        .filter((item): item is CustomerRecord => item !== null);
+      return { records: normalizeArray(candidate), total };
+    }
+    if (isRecord(candidate)) {
+      const nestedArray = findArrayIn(candidate);
+      if (nestedArray.length > 0) {
+        return { records: normalizeArray(nestedArray), total: nestedArray.length };
+      }
+    }
+  }
+  return { records: [], total };
+}
+
+function normalizeArray(items: unknown[]): CustomerRecord[] {
+  return items
+    .map((item) => normalizeCustomerRecord(item))
+    .filter((item): item is CustomerRecord => item !== null);
+}
+
+function findArrayIn(container: Record<string, unknown>): unknown[] {
+  for (const key of COLLECTION_KEYS) {
+    const candidate = container[key];
+    if (Array.isArray(candidate)) {
+      return candidate;
     }
   }
   return [];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

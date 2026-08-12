@@ -37,39 +37,12 @@ const ACCENT_STYLES: Record<ActionCard['accent'], string> = {
 
 /** Presentational "Actions" strip matching the assessment reference. */
 @Component({
-  selector: 'app-actions-section',
-  template: `
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      @for (card of cards; track card.title) {
-        <button
-          type="button"
-          (click)="onOpen(card.title)"
-          class="group flex items-start gap-4 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
-        >
-          <div
-            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg"
-            [class]="accentStyle(card.accent)"
-            aria-hidden="true"
-          >
-            <i [class]="card.icon" class="pi text-lg"></i>
-          </div>
-          <div class="min-w-0">
-            <div class="flex items-center gap-2 text-sm font-semibold text-slate-800">
-              {{ card.title }}
-              <i
-                class="pi pi-arrow-up-right text-xs text-slate-300 transition group-hover:text-blue-500"
-                aria-hidden="true"
-              ></i>
-            </div>
-            <p class="mt-1 text-xs leading-5 text-slate-400">{{ card.description }}</p>
-          </div>
-        </button>
-      }
-    </div>
-  `,
+  selector: 'app-customer-actions',
+  templateUrl: './customer-actions.component.html',
+  styleUrl: './customer-actions.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ActionsSectionComponent {
+export class CustomerActionsComponent {
   protected readonly cards = ACTION_CARDS;
   private readonly messageService = inject(MessageService);
 

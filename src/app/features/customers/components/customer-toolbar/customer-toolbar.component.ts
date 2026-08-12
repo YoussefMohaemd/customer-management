@@ -34,86 +34,14 @@ const CATEGORICAL_FILTER_LABELS: Record<CustomerFilterKey, string> = {
 
 /**
  * Search + filter strip above the table. Presentational: raw search values
- * are emitted through `searchChange` and the RxJS debounce/cancel pipeline
- * lives in the page component. The filters panel is self-contained.
+ * are emitted through `searchChange` — the debounce/cancel pipeline lives in
+ * the store. The filters panel is self-contained.
  */
 @Component({
   selector: 'app-customer-toolbar',
   imports: [FormsModule, ButtonModule, InputTextModule, TooltipModule, CustomerFiltersComponent],
-  template: `
-    <div class="flex flex-col gap-3">
-      <div class="flex flex-wrap items-center gap-2.5">
-        <!-- Server-side search -->
-        <div class="relative min-w-[220px] flex-1">
-          <i
-            class="pi pi-search pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400"
-            aria-hidden="true"
-          ></i>
-          <input
-            type="search"
-            [ngModel]="searchValue()"
-            (ngModelChange)="onSearchInput($event)"
-            placeholder="Search by name, code, mobile or email…"
-            aria-label="Search customers"
-            class="h-9 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-16 text-sm text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20"
-          />
-          @if (searchValue()) {
-            <button
-              type="button"
-              (click)="clearSearch()"
-              class="absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
-              aria-label="Clear search"
-            >
-              <i class="pi pi-times text-xs"></i>
-            </button>
-          }
-        </div>
-
-        <app-customer-filters />
-
-        @if (store.hasFilters()) {
-          <p-button
-            label="Clear filters"
-            icon="pi pi-filter-slash"
-            [text]="true"
-            size="small"
-            (onClick)="store.clearAllFilters()"
-            [pTooltip]="'Remove all filters'"
-            tooltipPosition="bottom"
-          />
-        }
-      </div>
-
-      <!-- Selected filter chips -->
-      @if (store.totalFilterCount() > 0) {
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="text-xs font-medium text-slate-400">Active filters:</span>
-          @for (chip of activeChips(); track chip.key) {
-            <span
-              class="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 py-1 pl-2.5 pr-1.5 text-xs font-medium text-blue-700"
-            >
-              {{ chip.label }}: {{ chip.value }}
-              <button
-                type="button"
-                (click)="removeChip(chip.key)"
-                class="flex h-4 w-4 items-center justify-center rounded-full text-blue-400 transition hover:bg-blue-100 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
-                [attr.aria-label]="'Remove ' + chip.label + ' filter'"
-              >
-                <i class="pi pi-times text-[9px]"></i>
-              </button>
-            </span>
-          }
-          <button
-            type="button"
-            (click)="store.clearAllFilters()"
-            class="rounded text-xs font-medium text-blue-600 transition hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
-          >
-            Clear all
-          </button>
-        </div>
-      }
-    </div>
-  `,
+  templateUrl: './customer-toolbar.component.html',
+  styleUrl: './customer-toolbar.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CustomerToolbarComponent {

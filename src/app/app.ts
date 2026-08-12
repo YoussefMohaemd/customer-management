@@ -5,15 +5,7 @@ import { ToastModule } from 'primeng/toast';
 @Component({
   selector: 'app-root',
   imports: [RouterOutlet, ToastModule],
-  template: `
-    <router-outlet />
-    <p-toast
-      position="top-right"
-      [showTransformOptions]="'translateY(100%)'"
-      [showTransitionOptions]="'150ms'"
-      [hideTransitionOptions]="'150ms'"
-      [hideTransformOptions]="'translateY(100%)'"
-    />
-  `,
+  templateUrl: './app.html',
+  styleUrl: './app.scss',
 })
 export class App {}

@@ -25,17 +25,8 @@ const UNAVAILABLE_ACTIONS: readonly { label: string; icon: string }[] = [
 @Component({
   selector: 'app-customer-actions-menu',
   imports: [MenuModule],
-  template: `
-    <button
-      type="button"
-      (click)="menu.toggle($event)"
-      class="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
-      [attr.aria-label]="'Actions for ' + customer().commercialName"
-    >
-      <i class="pi pi-ellipsis-v text-sm"></i>
-    </button>
-    <p-menu #menu [model]="menuModel()" popup="true" appendTo="body" styleClass="w-60" />
-  `,
+  templateUrl: './customer-actions-menu.component.html',
+  styleUrl: './customer-actions-menu.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CustomerActionsMenuComponent {

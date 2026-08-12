@@ -1,0 +1,12 @@
+:host {
+  display: block;
+}
+
+::ng-deep {
+  /* Compact dense inputs inside the modal form */
+  .p-inputtext,
+  .p-select,
+  .p-datepicker {
+    width: 100%;
+  }
+}

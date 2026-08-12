@@ -1,8 +1,22 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
-import { Observable, catchError, EMPTY, finalize, map, of, tap, throwError } from 'rxjs';
+import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import {
+  Observable,
+  Subject,
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  EMPTY,
+  finalize,
+  map,
+  switchMap,
+  tap,
+  throwError,
+} from 'rxjs';
 
 import { environment } from '@environments/environment';
 import {
+  CustomerListResult,
   CustomerPayload,
   CustomerRecord,
   createCustomerPayloadDefaults,
@@ -27,20 +41,23 @@ export type CustomerFormMode = 'create' | 'edit' | 'view';
 /**
  * Signal-based customer store.
  *
- * The staging Read API has no server-side pagination/sorting parameters, so
- * the store loads the matching set (server-filtered via the `Text` parameter)
- * and derives pagination/sorting in memory. Only the current page is rendered.
- * See README → "Known API Limitations" for the exact contract facts.
+ * The staging Read API has no server-side pagination/sorting parameters
+ * (verified: `Page`/`PageSize`/`Skip`/`Take` are ignored), so the store loads
+ * the server-filtered matching set and derives pagination/sorting in memory.
+ * Only the current page is rendered. See README → "Known API Limitations".
  *
- * Async operations (search, save) are exposed as Observables; UI state is
- * always consumed through signals/computed().
+ * Async orchestration (debounced search, text-filter reloads, post-save
+ * refresh) lives here in one RxJS pipeline, so every state change that needs
+ * a server round-trip reliably triggers one — with stale requests cancelled.
  */
 @Injectable({ providedIn: 'root' })
 export class CustomerStore {
   private readonly customerService = inject(CustomerService);
+  private readonly destroyRef = inject(DestroyRef);
 
   // --- Server-driven state -------------------------------------------------
   readonly records = signal<CustomerRecord[]>([]);
+  readonly totalCount = signal(0);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly loadWarning = signal<string | null>(null);
@@ -65,6 +82,28 @@ export class CustomerStore {
   readonly formCustomer = signal<CustomerRecord | null>(null);
 
   private lastExecutedQuery: CustomerQuery | null = null;
+
+  // --- Async triggers --------------------------------------------------------
+  private readonly searchSource$ = new Subject<string>();
+  private readonly reloadSource$ = new Subject<void>();
+
+  constructor() {
+    this.searchSource$
+      .pipe(
+        debounceTime(environment.customers.searchDebounceMs),
+        distinctUntilChanged(),
+        switchMap((term) => this.executeSearch(term)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe();
+
+    this.reloadSource$
+      .pipe(
+        switchMap(() => this.executeQuery(this.currentQuery())),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe();
+  }
 
   // --- Derived state --------------------------------------------------------
   readonly totalRecords = computed(() => this.records().length);
@@ -114,6 +153,7 @@ export class CustomerStore {
   readonly totalPages = computed(() =>
     Math.max(1, Math.ceil(this.sortedRecords().length / this.pageSize())),
   );
+
   readonly paginatedCustomers = computed<CustomerRecord[]>(() => {
     const start = (this.page() - 1) * this.pageSize();
     return this.sortedRecords().slice(start, start + this.pageSize());
@@ -125,11 +165,15 @@ export class CustomerStore {
     return Math.min(end, this.sortedRecords().length);
   });
   readonly hasRecords = computed(() => this.records().length > 0);
+
   readonly isEmptyResult = computed(
     () => !this.loading() && !this.error() && this.records().length === 0,
   );
+
   readonly hasServerSearch = computed(() => this.searchTerm().trim().length > 0);
+
   readonly hasFilters = computed(() => hasAnyFilter(this.currentQuery()));
+
   readonly totalFilterCount = computed(() => {
     let count = 0;
     for (const value of Object.values(this.textFilters())) {
@@ -149,13 +193,13 @@ export class CustomerStore {
   readonly clientTypeOptions = computed(() =>
     distinctBy(this.records(), (r) => r.accountTypeId).map((r) => ({
       value: r.accountTypeId,
-      label: `Client Type ${r.accountTypeId}`,
+      label: r.accountTypeName || `Client Type ${r.accountTypeId}`,
     })),
   );
   readonly accountManagerOptions = computed(() =>
     distinctBy(this.records(), (r) => r.accountManagerId).map((r) => ({
       value: r.accountManagerId,
-      label: `Account Manager ${r.accountManagerId}`,
+      label: r.accountManagerName || `Account Manager ${r.accountManagerId}`,
     })),
   );
   readonly cityOptions = computed(() =>
@@ -171,7 +215,7 @@ export class CustomerStore {
     })),
   );
 
-  // --- Query assembly -------------------------------------------------------
+  // --- Query assembly ---------------------------------------------------------
   private currentQuery(): CustomerQuery {
     return {
       search: this.searchTerm(),
@@ -184,69 +228,28 @@ export class CustomerStore {
     };
   }
 
-  /**
-   * Fetches the matching customer set. Returns an Observable so callers can
-   * orchestrate it with RxJS (e.g. switchMap for debounced search) and so
-   * stale requests are cancelled. Repeated identical queries are de-duplicated.
-   */
-  loadCustomers(): Observable<CustomerRecord[]> {
-    const query = this.currentQuery();
+  // --- Server triggers --------------------------------------------------------
 
-    if (this.loading()) {
-      return EMPTY;
-    }
-    if (this.lastExecutedQuery && isCustomerQueryEqual(this.lastExecutedQuery, query)) {
-      return of(this.records());
-    }
-
-    this.lastExecutedQuery = query;
-    this.loading.set(true);
-    this.error.set(null);
-    this.loadWarning.set(null);
-
-    return this.customerService.fetchCustomers(query).pipe(
-      tap((records) => {
-        this.records.set(records);
-        if (records.length > environment.customers.maxRecordsToLoad) {
-          this.loadWarning.set(
-            `The server returned ${records.length.toLocaleString()} matching records. ` +
-              `For safety this app caps the loaded set at ${environment.customers.maxRecordsToLoad.toLocaleString()} — ` +
-              `narrow your search to work with a smaller set.`,
-          );
-          this.records.set(records.slice(0, environment.customers.maxRecordsToLoad));
-        }
-      }),
-      catchError((error: unknown) => {
-        this.lastExecutedQuery = null;
-        this.error.set(messageFrom(error));
-        return throwError(() => error);
-      }),
-      finalize(() => this.loading.set(false)),
-    );
-  }
-
-  /** Debounced server-side search — invoked from the page via switchMap. */
-  searchCustomers(term: string): Observable<CustomerRecord[]> {
-    if (term === this.searchTerm()) {
-      return of(this.records());
-    }
-    this.searchTerm.set(term.trim());
+  /** Debounced server-side search (400 ms, stale requests cancelled). */
+  search(term: string): void {
+    this.searchTerm.set(term);
     this.page.set(1);
-    return this.loadCustomers();
+    this.searchSource$.next(term);
   }
 
-  /** Clears the search box and reloads the full set. */
-  clearSearch(): Observable<CustomerRecord[]> {
-    if (this.searchTerm() === '' && this.resultsAlreadyLoaded) {
-      return EMPTY;
-    }
-    return this.searchCustomers('');
+  /** Clears the search box; reloads the full set. */
+  clearSearch(): void {
+    this.searchTerm.set('');
+    this.page.set(1);
+    this.searchSource$.next('');
   }
 
-  private get resultsAlreadyLoaded(): boolean {
-    return this.lastExecutedQuery !== null && this.lastExecutedQuery.search === '';
+  /** Re-runs the current query (used for retry and after-save refresh). */
+  reload(): void {
+    this.reloadSource$.next();
   }
 
+  // --- Pagination / sorting (client-side over the loaded set) ----------------
   setPage(page: number): void {
     const bounded = Math.min(Math.max(page, 1), this.totalPages());
     this.page.set(bounded);
@@ -267,7 +270,7 @@ export class CustomerStore {
     this.page.set(1);
   }
 
-  // --- Text filters (server-side via the `Text` parameter) ------------------
+  // --- Text filters (server-side via the `Text` parameter) -------------------
   setTextFilter(key: CustomerTextFilterKey, value: string): void {
     const current = { ...this.textFilters() };
     if ((value ?? '').trim()) {
@@ -277,11 +280,13 @@ export class CustomerStore {
     }
     this.textFilters.set(current);
     this.page.set(1);
+    this.reloadSource$.next();
   }
 
   clearTextFilters(): void {
     this.textFilters.set({});
     this.page.set(1);
+    this.reloadSource$.next();
   }
 
   // --- Categorical filters (over the loaded set — API limitation) -----------
@@ -300,7 +305,7 @@ export class CustomerStore {
     this.clearCategoricalFilters();
   }
 
-  // --- Form dialog ----------------------------------------------------------
+  // --- Form dialog ------------------------------------------------------------
   openCreateForm(): void {
     this.formCustomer.set(null);
     this.formMode.set('create');
@@ -333,8 +338,8 @@ export class CustomerStore {
   }
 
   /**
-   * Runs the SaveCustomerWithContactPerson call. Disables duplicate submits
-   * via the `saving` signal. On success the list is refreshed.
+   * Runs the SaveCustomerWithContactPerson upsert. Duplicate submits are
+   * blocked via the `saving` signal; on success the list is refreshed.
    */
   saveCustomer(payload: CustomerPayload): Observable<SaveCustomerResult> {
     if (this.saving()) {
@@ -344,21 +349,19 @@ export class CustomerStore {
     this.saveError.set(null);
 
     return this.customerService.saveCustomer(payload).pipe(
-      finalize(() => this.saving.set(false)),
+      map((result) => {
+        if (result.success) {
+          // Bust the query cache so the refreshed list is fetched from the server.
+          this.lastExecutedQuery = null;
+          this.reloadSource$.next();
+        }
+        return result;
+      }),
       catchError((error: unknown) => {
         this.saveError.set(messageFrom(error));
         return throwError(() => error);
       }),
-      // Refresh the list so the new/updated record shows up immediately.
-      map((result) => {
-        if (result.success) {
-          this.lastExecutedQuery = null;
-          void this.loadCustomers().subscribe({
-            error: () => undefined,
-          });
-        }
-        return result;
-      }),
+      finalize(() => this.saving.set(false)),
     );
   }
 
@@ -366,6 +369,54 @@ export class CustomerStore {
   createPayload(): CustomerPayload {
     return createCustomerPayloadDefaults();
   }
+
+  // --- Query execution ---------------------------------------------------------
+
+  private executeSearch(term: string): Observable<CustomerListResult> {
+    return this.executeQuery({ ...this.currentQuery(), search: term });
+  }
+
+  /**
+   * Runs a server query into the store. Identical consecutive queries and
+   * queries that start while another one is still in flight are dropped so
+   * no duplicate requests hit the network.
+   */
+  private executeQuery(query: CustomerQuery): Observable<CustomerListResult> {
+    if (this.loading() || (this.lastExecutedQuery !== null && isCustomerQueryEqual(this.lastExecutedQuery, query))) {
+      return EMPTY;
+    }
+
+    this.lastExecutedQuery = query;
+    this.loading.set(true);
+    this.error.set(null);
+    this.loadWarning.set(null);
+
+    return this.customerService.fetchCustomers(query).pipe(
+      tap((result) => {
+        const records = capRecords(result.records);
+        this.records.set(records);
+        this.totalCount.set(result.total);
+        if (records.length < result.records.length) {
+          this.loadWarning.set(
+            `The server returned ${result.records.length.toLocaleString()} matching records. ` +
+              `For safety this app caps the loaded set at ${environment.customers.maxRecordsToLoad.toLocaleString()} — ` +
+              `narrow your search to work with a smaller set.`,
+          );
+        }
+      }),
+      catchError((error: unknown) => {
+        this.lastExecutedQuery = null;
+        this.error.set(messageFrom(error));
+        return EMPTY;
+      }),
+      finalize(() => this.loading.set(false)),
+    );
+  }
+}
+
+function capRecords(records: CustomerRecord[]): CustomerRecord[] {
+  const cap = environment.customers.maxRecordsToLoad;
+  return records.length > cap ? records.slice(0, cap) : records;
 }
 
 function distinctBy<T>(items: T[], key: (item: T) => number | null): T[] {
