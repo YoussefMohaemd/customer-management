@@ -1,13 +1,12 @@
 .customer-datatable {
   ::ng-deep {
     .p-datatable-thead > tr > th {
-      background: #eaf2fc;
-      color: #40536e;
+      background: hsl(213, 75%, 95%);
+      color: #487af2 ;
       font-size: 12px;
       font-weight: 600;
       letter-spacing: 0.1px;
       padding: 8px 12px;
-      border-width: 0 1px 1px 0;
       border-color: #dbe7f3 #dbe7f3 #d2e0ef transparent;
       white-space: nowrap;
 
@@ -16,7 +15,7 @@
       }
 
       &.left {
-        text-align: left;
+        text-align: center;
       }
 
       &:focus-visible {
@@ -25,7 +24,7 @@
     }
 
     .p-datatable-tbody > tr > td {
-      padding: 10px 12px;
+      padding: 11px 10px !important;
       border-width: 0 0 1px 0;
       border-color: #eef1f5;
       font-size: 12px;
