@@ -47,8 +47,6 @@ export class CustomerColumnPickerComponent implements AfterViewInit, OnDestroy {
 
   /** Dropdown field-search term (client-side only, never hits the API). */
   protected readonly searchTerm = signal('');
-  /** Field the search ✓ button will select (first result by default). */
-  protected readonly activeField = signal<CustomerFieldKey | null>(null);
 
   /** Every API field matching the search term, in catalog order. */
   protected readonly filteredColumnDefs = computed(() => {
@@ -63,9 +61,20 @@ export class CustomerColumnPickerComponent implements AfterViewInit, OnDestroy {
     );
   });
 
-  /** The field the ✓ button acts on: hovered row, or first filtered result. */
-  protected readonly activeOption = computed(
-    () => this.activeField() ?? this.filteredColumnDefs()[0]?.field ?? null,
+  /** True when every field matching the search is visible (false with no matches). */
+  protected readonly searchAllSelected = computed(() => {
+    const results = this.filteredColumnDefs();
+    return results.length > 0 && results.every((column) => this.store.isColumnVisible(column.field));
+  });
+
+  /** True when at least one matching field is already visible (partial state). */
+  protected readonly searchSomeSelected = computed(() =>
+    this.filteredColumnDefs().some((column) => this.store.isColumnVisible(column.field)),
+  );
+
+  /** Neutral/disabled while there is no search term or no matching results. */
+  protected readonly searchDisabled = computed(
+    () => !this.searchTerm().trim() || this.filteredColumnDefs().length === 0,
   );
 
   @ViewChild('chipsScroll', { read: ElementRef })
@@ -92,11 +101,15 @@ export class CustomerColumnPickerComponent implements AfterViewInit, OnDestroy {
     this.toggle(field, !this.store.isColumnVisible(field));
   }
 
-  /** The ✓ button selects the currently active (hovered/first) field. */
-  protected confirmActive(): void {
-    const field = this.activeOption();
-    if (field) {
-      this.toggleOption(field);
+  /** Explicit click on the search checkbox selects/clears every current match. */
+  protected toggleSearchAll(): void {
+    const results = this.filteredColumnDefs();
+    if (results.length === 0) {
+      return;
+    }
+    const selectAll = !results.every((column) => this.store.isColumnVisible(column.field));
+    for (const column of results) {
+      this.toggle(column.field, selectAll);
     }
   }
 
@@ -112,17 +125,7 @@ export class CustomerColumnPickerComponent implements AfterViewInit, OnDestroy {
   }
 
   protected onSearchInput(event: Event): void {
-    const value = (event.target as HTMLInputElement).value;
-    this.searchTerm.set(value);
-    this.syncActiveField();
-  }
-
-  protected setActive(field: CustomerFieldKey): void {
-    this.activeField.set(field);
-  }
-
-  private syncActiveField(): void {
-    this.activeField.set(this.filteredColumnDefs()[0]?.field ?? null);
+    this.searchTerm.set((event.target as HTMLInputElement).value);
   }
 
   /**

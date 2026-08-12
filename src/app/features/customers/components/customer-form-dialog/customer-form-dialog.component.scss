@@ -10,6 +10,11 @@
         linear-gradient(180deg, #f8fafc 0%, #ffffff 120px);
     }
 
+    /* closable stays on so mask clicks dismiss the dialog; hide the X button */
+    .p-dialog-header-actions {
+      display: none;
+    }
+
     .p-dialog-footer {
       padding: 0;
     }

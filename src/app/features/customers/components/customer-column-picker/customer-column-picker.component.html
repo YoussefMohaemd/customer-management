@@ -42,18 +42,24 @@
 >
   <ng-template pTemplate="content">
     <div class="column-panel">
-      <!-- Compact search + check/select control, side by side -->
+      <!-- Search: select-all checkbox for the current results + search input, side by side -->
       <div class="column-search-row">
         <button
           type="button"
-          class="column-select-btn"
-          (click)="confirmActive()"
-          [disabled]="!activeOption()"
-          aria-label="Select the highlighted field"
+          class="column-checkbox"
+          [class.checked]="searchAllSelected()"
+          [class.partial]="searchSomeSelected() && !searchAllSelected()"
+          [disabled]="searchDisabled()"
+          (click)="toggleSearchAll()"
+          aria-label="Select or clear all current search results"
         >
-          <i class="pi pi-check" aria-hidden="true"></i>
+          @if (searchAllSelected()) {
+            <i class="pi pi-check" aria-hidden="true"></i>
+          } @else if (searchSomeSelected() && !searchAllSelected()) {
+            <i class="pi pi-minus" aria-hidden="true"></i>
+          }
         </button>
-         <div class="column-search">
+        <div class="column-search">
           <input
             type="text"
             class="column-search-input"
@@ -73,17 +79,17 @@
               type="button"
               class="column-option"
               [class.selected]="store.isColumnVisible(column.field)"
-              [class.active]="activeOption() === column.field"
               [class.disabled]="isLastVisible(column.field)"
               (click)="toggleOption(column.field)"
-              (mouseenter)="setActive(column.field)"
               [attr.aria-pressed]="store.isColumnVisible(column.field)"
             >
-              <i
-                class="pi pi-check column-check-icon"
-                [class.visible]="store.isColumnVisible(column.field)"
+              <span
+                class="column-checkbox"
+                [class.checked]="store.isColumnVisible(column.field)"
                 aria-hidden="true"
-              ></i>
+              >
+                <i class="pi pi-check" aria-hidden="true"></i>
+              </span>
               <span class="column-label">{{ column.label }}</span>
             </button>
           </li>
