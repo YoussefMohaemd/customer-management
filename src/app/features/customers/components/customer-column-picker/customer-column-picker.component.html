@@ -1,0 +1,57 @@
+<button
+  #columnButton
+  type="button"
+  (click)="panel.toggle($event)"
+  class="column-button"
+  [attr.aria-haspopup]="'dialog'"
+  [attr.aria-expanded]="popoverOpen"
+  aria-label="Choose columns"
+>
+  <i class="pi pi-table text-[13px]" aria-hidden="true"></i>
+  <span class="hidden sm:inline">Columns</span>
+  <span class="column-count"
+    >{{ store.visibleColumnCount() }}/{{ store.allColumnDefs().length }}</span
+  >
+  <i class="pi pi-angle-down text-[10px] text-slate-400" aria-hidden="true"></i>
+</button>
+
+<p-popover
+  #panel
+  [dismissable]="true"
+  appendTo="body"
+  (onShow)="popoverOpen = true"
+  (onHide)="popoverOpen = false"
+>
+  <ng-template pTemplate="content">
+    <div class="column-panel">
+      <div class="column-panel-head">
+        <span class="column-panel-title">Columns</span>
+        <button
+          type="button"
+          class="reset-btn"
+          (click)="reset()"
+          aria-label="Reset columns to defaults"
+        >
+          Reset
+        </button>
+      </div>
+      <p class="column-panel-hint">Choose which API fields appear in the table.</p>
+      <ul class="column-list">
+        @for (column of store.allColumnDefs(); track column.field) {
+          <li>
+            <label class="column-option" [class.disabled]="isLastVisible(column.field)">
+              <input
+                type="checkbox"
+                class="column-check"
+                [checked]="store.isColumnVisible(column.field)"
+                [disabled]="isLastVisible(column.field)"
+                (change)="toggle(column.field, $event.target.checked)"
+              />
+              <span class="column-label">{{ column.label }}</span>
+            </label>
+          </li>
+        }
+      </ul>
+    </div>
+  </ng-template>
+</p-popover>

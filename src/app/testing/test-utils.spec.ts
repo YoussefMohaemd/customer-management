@@ -5,7 +5,7 @@
  * application build (tsconfig.app excludes `src/**\/*.spec.ts`) while still
  * being compiled by the unit-test runner.
  */
-import { Provider } from '@angular/core';
+import { EnvironmentProviders, Provider } from '@angular/core';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { providePrimeNG } from 'primeng/config';
 import Aura from '@primeuix/themes/aura';
@@ -14,7 +14,7 @@ import { ConfirmationService, MessageService } from 'primeng/api';
 import { CustomerRecord } from '@features/customers/models/customer.model';
 
 /** Provider set shared by every component spec (PrimeNG theme + toasts). */
-export function provideTestConfig(): Provider[] {
+export function provideTestConfig(): (Provider | EnvironmentProviders)[] {
   return [
     provideHttpClientTesting(),
     providePrimeNG({

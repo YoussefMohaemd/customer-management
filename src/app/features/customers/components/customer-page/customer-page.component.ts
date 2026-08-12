@@ -1,10 +1,9 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
-import { PaginatorModule } from 'primeng/paginator';
 import { TooltipModule } from 'primeng/tooltip';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService, MessageService } from 'primeng/api';
-import { PaginatorState } from 'primeng/paginator';
 
 import { environment } from '@environments/environment';
 import { CustomerRecord } from '@features/customers/models/customer.model';
@@ -29,8 +28,8 @@ import { CustomerExcelService } from '@features/customers/services/customer-exce
 @Component({
   selector: 'app-customer-page',
   imports: [
+    FormsModule,
     ButtonModule,
-    PaginatorModule,
     TooltipModule,
     ConfirmDialogModule,
     CustomerToolbarComponent,
@@ -51,6 +50,22 @@ export class CustomerPageComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly pageSizeOptions = environment.customers.pageSizeOptions;
+
+  protected readonly totalLabel = computed(() =>
+    this.store.sortedRecords().length.toLocaleString(),
+  );
+
+  /** Up to 5 page links, sliding around the current page. */
+  protected readonly pageLinks = computed<number[]>(() => {
+    const page = this.store.page();
+    const total = this.store.totalPages();
+    if (total <= 1) {
+      return [1];
+    }
+    const start = Math.max(1, Math.min(page - 2, total - 4));
+    const count = Math.min(5, total - start + 1);
+    return Array.from({ length: count }, (_, index) => start + index);
+  });
 
   ngOnInit(): void {
     this.store.reload();
@@ -73,12 +88,12 @@ export class CustomerPageComponent implements OnInit {
     this.store.clearSearch();
   }
 
-  protected onPageChange(event: PaginatorState): void {
-    if (event.rows !== this.store.pageSize()) {
-      this.store.setPageSize(event.rows ?? 1);
-      return;
-    }
-    this.store.setPage((event.first ?? 0) / (event.rows ?? 1) + 1);
+  protected goToPage(page: number): void {
+    this.store.setPage(page);
+  }
+
+  protected changePageSize(size: string | number): void {
+    this.store.setPageSize(Number(size));
   }
 
   protected exportExcel(): void {

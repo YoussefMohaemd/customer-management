@@ -6,6 +6,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { ButtonModule } from 'primeng/button';
 import { IconFieldModule } from 'primeng/iconfield';
 import { InputIconModule } from 'primeng/inputicon';
+import { FlagComponent } from '@shared/components/flag/flag.component';
 
 /**
  * App header: hamburger/collapse toggle, breadcrumb, global command/search
@@ -20,6 +21,7 @@ import { InputIconModule } from 'primeng/inputicon';
     ButtonModule,
     IconFieldModule,
     InputIconModule,
+    FlagComponent,
   ],
   templateUrl: './app-topbar.component.html',
   styleUrl: './app-topbar.component.scss',
@@ -31,8 +33,8 @@ export class AppTopbarComponent {
   private readonly messageService = inject(MessageService);
 
   protected readonly languages = computed(() => [
-    { label: 'English', value: 'en' },
-    { label: 'العربية', value: 'ar' },
+    { label: 'English', flag: 'us', value: 'en' },
+    { label: 'العربية', flag: 'eg', value: 'ar' },
   ]);
   protected selectedLanguage = 'en';
 
@@ -41,6 +43,24 @@ export class AppTopbarComponent {
       severity: 'info',
       summary: 'Notifications',
       detail: 'You are up to date. No new notifications.',
+      life: 2500,
+    });
+  }
+
+  protected onDevices(): void {
+    this.messageService.add({
+      severity: 'info',
+      summary: 'Devices',
+      detail: 'No devices detected.',
+      life: 2500,
+    });
+  }
+
+  protected onBot(): void {
+    this.messageService.add({
+      severity: 'info',
+      summary: 'AI Assistant',
+      detail: 'Assistant panel coming soon.',
       life: 2500,
     });
   }

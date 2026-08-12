@@ -4,6 +4,8 @@
  * does not implement natively.
  */
 
+import 'zone.js/testing';
+
 class ResizeObserverStub {
   observe(): void {}
   unobserve(): void {}

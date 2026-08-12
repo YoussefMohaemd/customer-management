@@ -4,7 +4,7 @@
   margin-inline: auto;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1rem;
   padding: 1.5rem 1rem;
 
   @media (min-width: 640px) {
@@ -13,6 +13,218 @@
 
   @media (min-width: 1024px) {
     padding-inline: 2rem;
+  }
+}
+
+.page-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.2px;
+  color: #2b3a4a;
+}
+
+.export-button {
+  display: inline-flex;
+  height: 36px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #e0e6ee;
+  border-radius: 6px;
+  background-color: #fff;
+  padding-inline: 14px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  color: #3f4a5c;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+
+  .pi {
+    font-size: 14px;
+    color: #1faa59;
+  }
+
+  &:hover:not(:disabled) {
+    border-color: #cdd7e4;
+    background-color: #f8fafc;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgb(43 99 224 / 0.5);
+  }
+}
+
+.table-card {
+  overflow: hidden;
+  border: 1px solid #dce3ec;
+  border-radius: 8px;
+  background-color: #fff;
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 0.05),
+    0 6px 18px rgb(15 23 42 / 0.06);
+}
+
+:host {
+  ::ng-deep {
+    .add-customer-btn {
+      &.p-button {
+        background-image: linear-gradient(180deg, #5d8cff 0%, #2f6be6 100%);
+        border-color: #2c66dd;
+        box-shadow:
+          inset 0 1px 0 rgb(255 255 255 / 0.22),
+          0 1px 3px rgb(44 102 221 / 0.35);
+
+        &:hover:not(:disabled) {
+          background-image: linear-gradient(180deg, #4f7ff8 0%, #2a63da 100%);
+          border-color: #2a5ccb;
+        }
+
+        &:active:not(:disabled) {
+          background-image: linear-gradient(180deg, #2a63da 0%, #2f6be6 100%);
+        }
+      }
+    }
+  }
+}
+
+.table-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-height: 46px;
+  padding: 9px 12px;
+  border-top: 1px solid #dee7f3;
+  background-color: #eff6ff;
+  font-size: 12px;
+  color: #3c4a5e;
+}
+
+.report-label {
+  white-space: nowrap;
+  color: #44566e;
+}
+
+.page-size {
+  height: 26px;
+  width: 62px;
+  border: 1px solid #c9d0d9;
+  border-radius: 4px;
+  background-color: #fff;
+  padding-inline: 4px;
+  font-size: 12px;
+  font-family: inherit;
+  color: #3c4a5e;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgb(44 127 255 / 0.35);
+  }
+}
+
+.page-size-label {
+  white-space: nowrap;
+  color: #536580;
+}
+
+.pagination-buttons {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pg-btn,
+.pg-num {
+  display: inline-flex;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #c9d0d9;
+  border-radius: 4px;
+  background-color: #fff;
+  padding: 0 8px;
+  font-size: 12px;
+  font-family: inherit;
+  color: #44566e;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
+
+  &:hover:not(:disabled) {
+    border-color: #9db4cf;
+    background-color: #f2f6fc;
+  }
+
+  &:disabled {
+    border-color: #e3e9f1;
+    background-color: #f3f6fa;
+    color: #b3bfcf;
+    cursor: not-allowed;
+  }
+}
+
+.pg-num {
+  width: 26px;
+  padding: 0;
+
+  &.active {
+    border-color: #2c7fff;
+    background-color: #2c7fff;
+    color: #fff;
+    font-weight: 600;
+  }
+}
+
+.pg-refresh {
+  display: inline-flex;
+  height: 26px;
+  width: 26px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 4px;
+  background-color: transparent;
+  color: #7c8aa0;
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
+
+  .pi {
+    font-size: 13px;
+  }
+
+  &:hover:not(:disabled) {
+    background-color: #dfe9f6;
+    color: #2c7fff;
+  }
+
+  &.spinning .pi {
+    animation: pg-refresh-spin 800ms linear infinite;
+  }
+}
+
+@keyframes pg-refresh-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
   }
 }
 

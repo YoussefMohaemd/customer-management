@@ -1,12 +1,16 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { provideRouter } from '@angular/router';
+import { Component } from '@angular/core';
+import { provideRouter, Router } from '@angular/router';
 import { MainLayoutComponent } from '@core/layout/main-layout.component';
 import { AppSidebarComponent } from '@core/layout/sidebar/app-sidebar.component';
 import { AppTopbarComponent } from '@core/layout/topbar/app-topbar.component';
 import { MessageService } from 'primeng/api';
 import { provideTestConfig } from '@app/testing/test-utils.spec';
+
+@Component({ template: '' })
+class StubRouteComponent {}
 
 describe('MainLayoutComponent', () => {
   let fixture: ComponentFixture<MainLayoutComponent>;
@@ -27,12 +31,7 @@ describe('MainLayoutComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('opens the mobile drawer when the toggle is used below lg breakpoint', () => {
-    Object.defineProperty(window, 'matchMedia', {
-      configurable: true,
-      value: vi.fn().mockReturnValue({ matches: false }),
-    });
-
+  it('opens the mobile drawer when the toggle is used', () => {
     component['onMenuToggle']();
     fixture.detectChanges();
 
@@ -47,15 +46,24 @@ describe('AppSidebarComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [AppSidebarComponent],
-      providers: [provideRouter([]), ...provideTestConfig()],
+      providers: [
+        provideRouter([
+          { path: 'customers', component: StubRouteComponent },
+          { path: 'dashboard', component: StubRouteComponent },
+        ]),
+        ...provideTestConfig(),
+      ],
     }).compileComponents();
 
+    const router = TestBed.inject(Router);
     fixture = TestBed.createComponent(AppSidebarComponent);
     fixture.componentRef.setInput('collapsed', false);
     fixture.detectChanges();
+    await router.navigateByUrl('/customers');
+    fixture.detectChanges();
   });
 
-  it('renders the documented navigation with Customer active', () => {
+  it('renders the documented navigation with the current route active', () => {
     const text = fixture.nativeElement.textContent ?? '';
     expect(text).toContain('Dashboard');
     expect(text).toContain('Customer');
@@ -64,19 +72,51 @@ describe('AppSidebarComponent', () => {
     expect(text).toContain('Sales Order');
     expect(text).toContain('Tickets');
 
-    const links = fixture.nativeElement.querySelectorAll('a');
-    const customerLink = Array.from(links).find((link) =>
+    const links = Array.from(fixture.nativeElement.querySelectorAll('a')) as HTMLElement[];
+    const customerLink = links.find((link) =>
       (link.textContent ?? '').includes('Customer'),
     ) as HTMLElement;
     expect(customerLink.getAttribute('aria-current')).toBe('page');
+    expect(customerLink.className).toContain('text-sky-400');
+  });
+
+  it('clears the active state when navigating away from the route', async () => {
+    const router = TestBed.inject(Router);
+
+    const links = Array.from(fixture.nativeElement.querySelectorAll('a')) as HTMLElement[];
+    const customerLink = links.find((link) =>
+      (link.textContent ?? '').includes('Customer'),
+    ) as HTMLElement;
+    const dashboardLink = links.find((link) =>
+      (link.textContent ?? '').includes('Dashboard'),
+    ) as HTMLElement;
+
+    expect(customerLink.getAttribute('aria-current')).toBe('page');
+    expect(dashboardLink.getAttribute('aria-current')).toBeNull();
+
+    await router.navigateByUrl('/dashboard');
+    fixture.detectChanges();
+
+    expect(customerLink.getAttribute('aria-current')).toBeNull();
+  });
+
+  it('emits collapseToggle from the desktop collapse arrow', () => {
+    let toggled = 0;
+    fixture.componentInstance['collapseToggle'].subscribe(() => (toggled += 1));
+
+    const arrow = fixture.nativeElement.querySelector('button[aria-label="Collapse sidebar"]');
+    arrow?.click();
+    fixture.detectChanges();
+
+    expect(toggled).toBe(1);
   });
 
   it('shows a toast instead of navigating for disabled modules', () => {
     const messageService = TestBed.inject(MessageService);
     const addSpy = vi.spyOn(messageService, 'add');
 
-    const links = fixture.nativeElement.querySelectorAll('a');
-    const dashboard = Array.from(links).find((link) =>
+    const links = Array.from(fixture.nativeElement.querySelectorAll('a')) as HTMLElement[];
+    const dashboard = links.find((link) =>
       (link.textContent ?? '').includes('Dashboard'),
     ) as HTMLElement;
     dashboard?.click();
@@ -112,7 +152,9 @@ describe('AppTopbarComponent', () => {
     let toggled = 0;
     fixture.componentInstance['menuToggle'].subscribe(() => (toggled += 1));
 
-    const button = fixture.nativeElement.querySelector('button[aria-label="Toggle navigation menu"]');
+    const button = fixture.nativeElement.querySelector(
+      'button[aria-label="Toggle navigation menu"]',
+    );
     button?.click();
 
     expect(toggled).toBe(1);

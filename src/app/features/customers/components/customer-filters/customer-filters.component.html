@@ -1,156 +1,128 @@
 <button
   #filterButton
   type="button"
-  (click)="popover.toggle($event)"
+  (click)="panel.toggle($event)"
   class="filter-button"
   [attr.aria-haspopup]="'dialog'"
   [attr.aria-expanded]="popoverOpen"
   aria-label="Toggle filters"
 >
-  <i class="pi pi-filter text-sm" aria-hidden="true"></i>
+  <i class="pi pi-filter text-[13px]" aria-hidden="true"></i>
   <span class="hidden sm:inline">Filter</span>
   @if (store.totalFilterCount() > 0) {
-    <span
-      class="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-[10px] font-bold text-white"
-      aria-label="{{ store.totalFilterCount() }} active filters"
-    >
+    <span class="filter-count" aria-label="{{ store.totalFilterCount() }} active filters">
       {{ store.totalFilterCount() }}
     </span>
   }
+  <i class="pi pi-angle-down text-[10px] text-slate-400" aria-hidden="true"></i>
 </button>
 
-<p-popover #popover [dismissable]="true" appendTo="body" (onShow)="onPanelOpen()" (onHide)="onPanelClose()">
+<p-popover
+  #panel
+  [dismissable]="true"
+  appendTo="body"
+  (onShow)="onPanelOpen()"
+  (onHide)="onPanelClose()"
+>
   <ng-template pTemplate="content">
-    <div class="w-[320px] sm:w-[380px]">
-      <div class="border-b border-slate-200 px-4 py-3">
-        <div class="flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-slate-800">Filters</h3>
+    <div class="filter-panel">
+      <div class="filter-panel-head">
+        <span class="filter-panel-title">Filter by</span>
+        @if (store.totalFilterCount() > 0) {
           <button
             type="button"
+            class="clear-all-btn"
             (click)="clearAll()"
-            class="rounded text-xs font-medium text-blue-600 transition hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:text-slate-300"
-            [disabled]="store.totalFilterCount() === 0"
+            aria-label="Clear all filters"
           >
             Clear all
           </button>
-        </div>
-        <p class="mt-0.5 text-[11px] leading-4 text-slate-400">
-          Text filters are sent to the server. Categorical filters apply to the loaded result
-          set.
+        }
+      </div>
+
+      @if (filterOptions().length === 0) {
+        <p class="fp-empty">
+          No filterable columns are selected. Open the <strong>Columns</strong> menu and select at
+          least one column that supports filtering.
         </p>
-      </div>
+      } @else {
+        <div class="fp-grid">
+          <label class="fp-field">
+            <span>Field</span>
+            <p-select
+              [options]="filterOptions()"
+              optionLabel="label"
+              optionValue="key"
+              [(ngModel)]="selectedField"
+              (ngModelChange)="onFieldChange($event)"
+              placeholder="Choose field"
+              [showClear]="true"
+              class="w-full"
+            />
+          </label>
 
-      <div class="grid grid-cols-2 gap-3 px-4 py-4">
-        <label class="flex flex-col gap-1 text-xs font-medium text-slate-600">
-          ID
-          <input
-            pInputText
-            type="number"
-            inputmode="numeric"
-            [(ngModel)]="values.id"
-            (ngModelChange)="onTextFilterChange('id', $event)"
-            placeholder="e.g. 1024"
-            class="w-full"
-          />
-        </label>
-        <label class="flex flex-col gap-1 text-xs font-medium text-slate-600">
-          Code
-          <input
-            pInputText
-            type="text"
-            [(ngModel)]="values.code"
-            (ngModelChange)="onTextFilterChange('code', $event)"
-            placeholder="CUST-001"
-            class="w-full"
-          />
-        </label>
-        <label class="flex flex-col gap-1 text-xs font-medium text-slate-600">
-          Name
-          <input
-            pInputText
-            type="text"
-            [(ngModel)]="values.name"
-            (ngModelChange)="onTextFilterChange('name', $event)"
-            placeholder="Customer name"
-            class="w-full"
-          />
-        </label>
-        <label class="flex flex-col gap-1 text-xs font-medium text-slate-600">
-          Email
-          <input
-            pInputText
-            type="email"
-            [(ngModel)]="values.email"
-            (ngModelChange)="onTextFilterChange('email', $event)"
-            placeholder="name@company.com"
-            class="w-full"
-          />
-        </label>
-        <label class="col-span-2 flex flex-col gap-1 text-xs font-medium text-slate-600">
-          Mobile
-          <input
-            pInputText
-            type="tel"
-            [(ngModel)]="values.mobile"
-            (ngModelChange)="onTextFilterChange('mobile', $event)"
-            placeholder="+20 1xx xxx xxxx"
-            class="w-full"
-          />
-        </label>
+          <label class="fp-field">
+            <span>Operator</span>
+            <p-select
+              [options]="operatorOptions()"
+              optionLabel="label"
+              optionValue="value"
+              [ngModel]="selectedOperator"
+              (ngModelChange)="onOperatorChange($event)"
+              placeholder="Operator"
+              [showClear]="true"
+              class="w-full"
+            />
+          </label>
 
-        <label class="flex flex-col gap-1 text-xs font-medium text-slate-600">
-          Client Type
-          <p-select
-            [options]="store.clientTypeOptions()"
-            [(ngModel)]="values.clientTypeId"
-            optionLabel="label"
-            optionValue="value"
-            placeholder="All types"
-            [showClear]="true"
-            class="w-full"
-            (ngModelChange)="onCategoricalFilterChange('clientTypeId', $event)"
-          />
-        </label>
-        <label class="flex flex-col gap-1 text-xs font-medium text-slate-600">
-          Account Manager
-          <p-select
-            [options]="store.accountManagerOptions()"
-            [(ngModel)]="values.accountManagerId"
-            optionLabel="label"
-            optionValue="value"
-            placeholder="All managers"
-            [showClear]="true"
-            class="w-full"
-            (ngModelChange)="onCategoricalFilterChange('accountManagerId', $event)"
-          />
-        </label>
-        <label class="flex flex-col gap-1 text-xs font-medium text-slate-600">
-          City
-          <p-select
-            [options]="store.cityOptions()"
-            [(ngModel)]="values.cityId"
-            optionLabel="label"
-            optionValue="value"
-            placeholder="All cities"
-            [showClear]="true"
-            class="w-full"
-            (ngModelChange)="onCategoricalFilterChange('cityId', $event)"
-          />
-        </label>
-        <label class="flex flex-col gap-1 text-xs font-medium text-slate-600">
-          Country
-          <p-select
-            [options]="store.countryOptions()"
-            [(ngModel)]="values.countryId"
-            optionLabel="label"
-            optionValue="value"
-            placeholder="All countries"
-            [showClear]="true"
-            class="w-full"
-            (ngModelChange)="onCategoricalFilterChange('countryId', $event)"
-          />
-        </label>
-      </div>
+          <label class="fp-field">
+            <span>Value</span>
+            @if (selectedFieldDef()?.kind === 'categorical') {
+              <p-select
+                [options]="categoricalValueOptions()"
+                optionLabel="label"
+                optionValue="value"
+                [(ngModel)]="selectedCategoricalValue"
+                placeholder="Value"
+                [showClear]="true"
+                class="w-full"
+              />
+            } @else {
+              <input
+                pInputText
+                type="text"
+                [(ngModel)]="selectedTextValue"
+                [placeholder]="
+                  selectedFieldDef()?.kind === 'numeric' ? 'Enter a number' : 'Filter value'
+                "
+                class="w-full"
+              />
+            }
+          </label>
+        </div>
+
+        <div class="fp-actions">
+          <button
+            type="button"
+            class="fp-apply"
+            (click)="apply()"
+            [disabled]="!canApply()"
+            aria-label="Apply filter"
+          >
+            <i class="pi pi-check text-[11px]" aria-hidden="true"></i>
+            Apply
+          </button>
+          <button
+            type="button"
+            class="fp-clear"
+            (click)="clearCurrent()"
+            [disabled]="!selectedFieldDef() && store.totalFilterCount() === 0"
+            aria-label="Clear current filter"
+          >
+            Clear
+          </button>
+        </div>
+      }
     </div>
   </ng-template>
 </p-popover>

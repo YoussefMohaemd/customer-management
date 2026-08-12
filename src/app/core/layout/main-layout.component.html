@@ -1,7 +1,7 @@
 <div class="flex h-screen overflow-hidden bg-slate-100">
   <!-- Desktop sidebar -->
   <div class="hidden lg:block" [class]="desktopCollapsed() ? 'w-[76px]' : 'w-64'">
-    <app-sidebar [collapsed]="desktopCollapsed()" />
+    <app-sidebar [collapsed]="desktopCollapsed()" (collapseToggle)="onDesktopCollapse()" />
   </div>
 
   <!-- Mobile drawer -->

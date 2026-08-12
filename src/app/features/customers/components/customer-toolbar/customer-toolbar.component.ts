@@ -6,6 +6,7 @@ import { TooltipModule } from 'primeng/tooltip';
 
 import { CustomerStore } from '@features/customers/state/customer.store';
 import { CustomerFiltersComponent } from '@features/customers/components/customer-filters/customer-filters.component';
+import { CustomerColumnPickerComponent } from '@features/customers/components/customer-column-picker/customer-column-picker.component';
 import {
   CustomerFilterKey,
   CustomerTextFilterKey,
@@ -39,7 +40,14 @@ const CATEGORICAL_FILTER_LABELS: Record<CustomerFilterKey, string> = {
  */
 @Component({
   selector: 'app-customer-toolbar',
-  imports: [FormsModule, ButtonModule, InputTextModule, TooltipModule, CustomerFiltersComponent],
+  imports: [
+    FormsModule,
+    ButtonModule,
+    InputTextModule,
+    TooltipModule,
+    CustomerFiltersComponent,
+    CustomerColumnPickerComponent,
+  ],
   templateUrl: './customer-toolbar.component.html',
   styleUrl: './customer-toolbar.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

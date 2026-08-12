@@ -1,24 +1,24 @@
 <aside
-  class="flex h-full flex-col bg-slate-900 text-slate-300 transition-[width] duration-200"
+  class="relative flex h-full flex-col bg-white text-slate-900 transition-[width] duration-200"
   [class.w-64]="!collapsed()"
   [class.w-[76px]]="collapsed()"
   [attr.aria-label]="'Main navigation'"
 >
   <!-- Brand -->
   <div
-    class="flex h-16 shrink-0 items-center gap-3 border-b border-slate-800 px-5"
+    class="flex h-16 shrink-0 items-center gap-3 border-b border-slate-200 px-5"
     [class.justify-center]="collapsed()"
   >
     <div
-      class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-900/40"
+      class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-200"
       [attr.aria-hidden]="true"
     >
       <i class="pi pi-building text-base"></i>
     </div>
     @if (!collapsed()) {
       <div class="min-w-0 leading-tight">
-        <div class="truncate text-sm font-bold text-white">Enterprise CRM</div>
-        <div class="truncate text-[11px] text-slate-400">Customer Management</div>
+        <div class="truncate text-sm font-bold text-slate-900">CRM</div>
+        <div class="truncate text-[11px] text-slate-500">Customer</div>
       </div>
     }
   </div>
@@ -30,15 +30,16 @@
         <li>
           <a
             [routerLink]="item.routerLink"
-            [attr.aria-current]="item.active ? 'page' : null"
-            [pTooltip]="collapsed() ? item.label : ''"
+            routerLinkActive
+            #rla="routerLinkActive"
+            [attr.aria-current]="rla.isActive ? 'page' : null"
             tooltipPosition="right"
-            [class]="linkClass(item)"
+            [class]="linkClass(item, rla.isActive)"
             [class.disabled-click]="!item.enabled"
             (click)="onItemClick(item, $event)"
           >
             <i [class]="item.icon" class="pi shrink-0 text-base" [attr.aria-hidden]="true"></i>
-            @if (item.active) {
+            @if (rla.isActive) {
               <span class="active-rail" aria-hidden="true"></span>
             }
             @if (!collapsed()) {
@@ -51,9 +52,10 @@
               ></i>
             }
             @if (item.badge) {
-              <span class="ml-auto rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold text-white">{{
-                item.badge
-              }}</span>
+              <span
+                class="ml-auto rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold text-white"
+                >{{ item.badge }}</span
+              >
             }
           </a>
         </li>
@@ -61,11 +63,18 @@
     </ul>
   </nav>
 
-  <!-- Footer -->
-  <div class="border-t border-slate-800 p-4" [class.hidden]="collapsed()">
-    <div class="flex items-center gap-2 text-[11px] text-slate-500">
-      <i class="pi pi-shield text-xs" aria-hidden="true"></i>
-      <span>ERP v21 · Production readiness</span>
-    </div>
-  </div>
+  <!-- Desktop collapse toggle -->
+  <button
+    type="button"
+    (click)="collapseToggle.emit()"
+    tooltipPosition="right"
+    class="absolute -right-3 top-1/2 z-10 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-md transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 lg:flex"
+    [attr.aria-label]="collapsed() ? 'Expand sidebar' : 'Collapse sidebar'"
+  >
+    <i
+      [class]="collapsed() ? 'pi pi-angle-right' : 'pi pi-angle-left'"
+      class="pi text-xs"
+      aria-hidden="true"
+    ></i>
+  </button>
 </aside>

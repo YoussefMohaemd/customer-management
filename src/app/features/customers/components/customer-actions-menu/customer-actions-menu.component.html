@@ -1,9 +1,11 @@
 <button
   type="button"
   (click)="menu.toggle($event)"
-  class="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+  class="action-trigger"
   [attr.aria-label]="'Actions for ' + customer().commercialName"
+  [attr.aria-haspopup]="'menu'"
 >
-  <i class="pi pi-ellipsis-v text-sm"></i>
+  <i class="pi pi-cog" aria-hidden="true"></i>
+  <i class="pi pi-angle-down" aria-hidden="true"></i>
 </button>
 <p-menu #menu [model]="menuModel()" popup="true" appendTo="body" styleClass="w-60" />

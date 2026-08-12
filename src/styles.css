@@ -1,8 +1,11 @@
-﻿/* Tailwind v4 is processed by the @tailwindcss/postcss plugin.
+﻿/* Tailwind v4 is processed by @tailwindcss/postcss (postcss.config.json).
+   tailwindcss-primeui adds the primeui-friendly utilities/animations.
+   @source pins the scanned files so the Angular builder cannot miss them.
    PrimeNG styles are injected at runtime through providePrimeNG (Aura preset).
    primeicons CSS is registered in angular.json → styles. */
 
 @import 'tailwindcss';
+@plugin 'tailwindcss-primeui';
 
 @source './index.html';
 @source './app/**/*.{html,ts,css,scss}';

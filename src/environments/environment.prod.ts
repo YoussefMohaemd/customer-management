@@ -12,8 +12,8 @@ export const environment: Environment = {
     direction: 'ltr',
   },
   customers: {
-    defaultPageSize: 8,
-    pageSizeOptions: [5, 8, 10, 20, 50],
+    defaultPageSize: 5,
+    pageSizeOptions: [5, 10, 20, 30],
     searchDebounceMs: 400,
     maxRecordsToLoad: 50000,
   },

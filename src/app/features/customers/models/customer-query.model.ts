@@ -9,6 +9,60 @@ export type CustomerFilterKey = 'clientTypeId' | 'accountManagerId' | 'cityId' |
 /** Text filters composed into the server-side `Text` search parameter. */
 export type CustomerTextFilterKey = 'id' | 'code' | 'name' | 'email' | 'mobile';
 
+/** Operators available for free-text filter values. */
+export type CustomerTextOperator = 'contains' | 'equals' | 'startsWith' | 'endsWith';
+
+/** Operators available for numeric filter values (e.g. ID). */
+export type CustomerNumericOperator =
+  'equals' | 'greaterThan' | 'greaterThanOrEqual' | 'lessThan' | 'lessThanOrEqual';
+
+/** Enumeration filters only support exact equality. */
+export type CustomerCategoricalOperator = 'equals';
+
+export type CustomerFilterOperator =
+  CustomerTextOperator | CustomerNumericOperator | CustomerCategoricalOperator;
+
+export const TEXT_OPERATORS: readonly CustomerTextOperator[] = [
+  'contains',
+  'equals',
+  'startsWith',
+  'endsWith',
+];
+
+export const NUMERIC_OPERATORS: readonly CustomerNumericOperator[] = [
+  'equals',
+  'greaterThan',
+  'greaterThanOrEqual',
+  'lessThan',
+  'lessThanOrEqual',
+];
+
+export const CATEGORICAL_OPERATORS: readonly CustomerCategoricalOperator[] = ['equals'];
+
+export const DEFAULT_TEXT_OPERATOR: CustomerTextOperator = 'contains';
+export const DEFAULT_NUMERIC_OPERATOR: CustomerNumericOperator = 'equals';
+
+export function customerOperatorLabel(operator: CustomerFilterOperator): string {
+  switch (operator) {
+    case 'contains':
+      return 'Contains';
+    case 'equals':
+      return 'Equals';
+    case 'startsWith':
+      return 'Starts With';
+    case 'endsWith':
+      return 'Ends With';
+    case 'greaterThan':
+      return 'Greater Than';
+    case 'greaterThanOrEqual':
+      return 'Greater Than or Equal';
+    case 'lessThan':
+      return 'Less Than';
+    case 'lessThanOrEqual':
+      return 'Less Than or Equal';
+  }
+}
+
 export interface CustomerFilters {
   clientTypeId: number | null;
   accountManagerId: number | null;

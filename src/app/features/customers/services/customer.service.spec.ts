@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { environment } from '@environments/environment';
 import { apiErrorInterceptor } from '@core/interceptors/api-error.interceptor';
 import { CustomerService } from '@features/customers/services/customer.service';
+import { CustomerListResult } from '@features/customers/models/customer.model';
 import { createEmptyCustomerQuery } from '@features/customers/models/customer-query.model';
 
 const READ_URL = `${environment.api.baseUrl}${environment.api.endpoints.readAllCrmClients}`;
@@ -29,9 +30,7 @@ describe('CustomerService', () => {
   it('GETs ReadAllCRMClients with the verified query parameters', () => {
     service.fetchCustomers({ ...createEmptyCustomerQuery(), search: 'salma' }).subscribe();
 
-    const request = http.expectOne(
-      (req) => req.method === 'GET' && req.url === `${READ_URL}`,
-    );
+    const request = http.expectOne((req) => req.method === 'GET' && req.url === `${READ_URL}`);
     expect(request.request.params.get('Text')).toBe('salma');
     expect(request.request.params.get('Direction')).toBe('ltr');
     expect(request.request.params.get('InCT')).toBe('');
@@ -40,10 +39,8 @@ describe('CustomerService', () => {
   });
 
   it('normalizes the real {Data, Total} response into typed records', () => {
-    let records: { records: { id: number }[]; total: number } | undefined;
-    service
-      .fetchCustomers(createEmptyCustomerQuery())
-      .subscribe((result) => (records = result));
+    let records: CustomerListResult | undefined;
+    service.fetchCustomers(createEmptyCustomerQuery()).subscribe((result) => (records = result));
 
     const request = http.expectOne(`${READ_URL}`);
     request.flush({

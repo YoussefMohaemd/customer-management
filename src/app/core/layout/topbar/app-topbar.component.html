@@ -1,28 +1,19 @@
 <header
-  class="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-4 sm:px-6"
+  class="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-8 border-b border-slate-200 bg-white px-4 sm:px-6"
   role="banner"
 >
-  <!-- Mobile hamburger / desktop collapse toggle -->
+  <!-- Mobile hamburger -->
   <button
     type="button"
     (click)="menuToggle.emit()"
-    [pTooltip]="'Toggle navigation'"
-    tooltipPosition="bottom"
-    class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+    class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 lg:hidden"
     aria-label="Toggle navigation menu"
   >
     <i class="pi pi-bars text-sm"></i>
   </button>
 
-  <!-- Breadcrumb / page context -->
-  <nav class="hidden min-w-0 items-center gap-2 text-sm md:flex" aria-label="Breadcrumb">
-    <span class="font-medium text-slate-400">CRM</span>
-    <i class="pi pi-angle-right text-[10px] text-slate-300" aria-hidden="true"></i>
-    <span class="font-semibold text-slate-800">Customer Management</span>
-  </nav>
-
   <!-- Global command / search area -->
-  <div class="mx-auto hidden w-full max-w-md lg:block">
+  <div class="hidden w-full max-w-[550px] lg:block">
     <div class="relative">
       <i
         class="pi pi-search pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400"
@@ -30,28 +21,47 @@
       ></i>
       <input
         type="search"
-        placeholder="Search anything…  ( / )"
+        placeholder="Search or type a command"
         aria-label="Global search"
-        class="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-14 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20"
+        class="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20"
       />
-      <kbd class="search-kbd">/</kbd>
+      <button
+        type="button"
+        tooltipPosition="bottom"
+        aria-label="Voice search"
+        class="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+      >
+        <i class="pi pi-microphone text-base"></i>
+      </button>
     </div>
   </div>
 
   <!-- Right cluster -->
-  <div class="ml-auto flex items-center gap-1.5 sm:gap-2">
+  <div class="ml-auto flex items-center gap-3 sm:gap-4 lg:gap-6">
     <p-select
+      class="lang-select"
       [options]="languages()"
       [(ngModel)]="selectedLanguage"
       optionLabel="label"
       optionValue="value"
-      styleClass="h-9 w-[92px]"
       [showClear]="false"
       aria-label="Select language"
     >
       <ng-template #selectedItem let-option>
+        <div class="flex items-center gap-0.5">
+          <app-flag [code]="option.flag" size="xs" />
+          <span class="text-[10px] font-medium text-slate-600">{{
+            option.value.toUpperCase()
+          }}</span>
+        </div>
+      </ng-template>
+      <ng-template #option let-option>
         <div class="flex items-center gap-2">
-          <span class="text-sm">{{ option.label }}</span>
+          <app-flag [code]="option.flag" />
+          <span class="text-sm font-medium text-slate-700">{{ option.label }}</span>
+          <span class="ml-auto text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            {{ option.value }}
+          </span>
         </div>
       </ng-template>
     </p-select>
@@ -59,16 +69,42 @@
     <button
       type="button"
       (click)="onNotifications()"
-      [pTooltip]="'Notifications'"
       tooltipPosition="bottom"
-      class="relative flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+      class="relative flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
       aria-label="Notifications"
     >
-      <i class="pi pi-bell text-base"></i>
-      <span class="absolute right-2 top-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" aria-hidden="true"></span>
+      <i class="pi pi-bell  text-[35px]"></i>
+      <span
+        class="absolute right-1.5 top-1 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"
+        aria-hidden="true"
+      ></span>
     </button>
 
-    <div class="mx-1 hidden h-6 w-px bg-slate-200 sm:block" aria-hidden="true"></div>
+    <button
+      type="button"
+      (click)="onDevices()"
+      tooltipPosition="bottom"
+      class="flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+      aria-label="Devices"
+    >
+      <i class="pi pi-desktop text-[35px]"></i>
+    </button>
+
+    <button
+      type="button"
+      (click)="onBot()"
+      tooltipPosition="bottom"
+      class="relative flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+      aria-label="AI Assistant"
+    >
+      <i class="pi pi-android text-[35px]"></i>
+      <span
+        class="absolute right-1.5 top-1 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-white"
+        aria-hidden="true"
+      ></span>
+    </button>
+
+    <div class="hidden h-6 w-px bg-slate-200 sm:block" aria-hidden="true"></div>
 
     <!-- User / profile -->
     <button
@@ -76,17 +112,10 @@
       class="flex items-center gap-2.5 rounded-lg px-1.5 py-1 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
       aria-label="User profile menu"
     >
-      <div class="hidden text-right sm:block">
-        <div class="text-sm font-semibold leading-4 text-slate-800">Youssef Ahmed</div>
-        <div class="text-[11px] leading-4 text-slate-400">Senior Sales Manager</div>
-      </div>
-      <div
-        class="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-bold text-white"
-        aria-hidden="true"
+      <img class="h-10 w-10 rounded-full object-cover" src="" alt="User avatar" />
+      <span class="hidden text-sm font-semibold flex-nowrap leading-4 text-slate-800 sm:block"
+        >Hello Youssef</span
       >
-        YA
-      </div>
-      <i class="pi pi-angle-down hidden text-[10px] text-slate-400 sm:block" aria-hidden="true"></i>
     </button>
   </div>
 </header>

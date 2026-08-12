@@ -1,16 +1,12 @@
 <div class="flex flex-col gap-3">
   <div class="flex flex-wrap items-center gap-2.5">
     <!-- Server-side search -->
-    <div class="relative min-w-[220px] flex-1">
-      <i
-        class="pi pi-search pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400"
-        aria-hidden="true"
-      ></i>
+    <div class="relative min-w-[240px] flex-1">
       <input
-        type="search"
+        type="text"
         [ngModel]="searchValue()"
         (ngModelChange)="onSearchInput($event)"
-        placeholder="Search by name, code, mobile or email…"
+        placeholder="Search..."
         aria-label="Search customers"
         class="search-input"
       />
@@ -18,27 +14,23 @@
         <button
           type="button"
           (click)="clearSearch()"
-          class="absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+          class="absolute right-10 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
           aria-label="Clear search"
         >
           <i class="pi pi-times text-xs"></i>
         </button>
       }
+      <i
+        class="pi pi-microphone pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[13px] text-slate-400"
+        aria-hidden="true"
+      ></i>
     </div>
 
+    <!-- Filter (panel driven by the selected columns) -->
     <app-customer-filters />
 
-    @if (store.hasFilters()) {
-      <p-button
-        label="Clear filters"
-        icon="pi pi-filter-slash"
-        [text]="true"
-        size="small"
-        (onClick)="store.clearAllFilters()"
-        [pTooltip]="'Remove all filters'"
-        tooltipPosition="bottom"
-      />
-    }
+    <!-- Dynamic column selection dropdown -->
+    <app-customer-column-picker class="ml-auto" />
   </div>
 
   <!-- Selected filter chips -->

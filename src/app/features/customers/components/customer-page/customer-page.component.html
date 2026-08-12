@@ -1,108 +1,159 @@
 <div class="page-shell">
   <!-- Page heading -->
-  <div class="flex flex-wrap items-end justify-between gap-3">
-    <div>
-      <h1 class="text-2xl font-bold tracking-tight text-slate-900">Customers</h1>
-      <p class="mt-1 text-sm text-slate-500">
-        Manage your customer base
-        @if (store.hasRecords()) {
-          · {{ store.totalRecords().toLocaleString() }} matching records
-        }
-        @if (store.hasServerSearch() || store.hasFilters()) {
-          · {{ store.sortedRecords().length.toLocaleString() }} after
-          {{ store.hasServerSearch() ? 'search' : '' }}
-          {{ store.hasServerSearch() && store.hasFilters() ? 'and' : '' }}
-          {{ store.hasFilters() ? 'filters' : '' }}
-        }
-      </p>
-    </div>
-    <div class="flex items-center gap-2.5">
-      <p-button
-        label="Export Excel"
-        icon="pi pi-file-excel"
-        [outlined]="true"
-        severity="contrast"
-        (onClick)="exportExcel()"
-        [disabled]="store.sortedRecords().length === 0"
-        [pTooltip]="
-          store.sortedRecords().length === 0
-            ? 'Nothing to export yet'
-            : 'Export the current result set'
-        "
-        tooltipPosition="top"
-      />
-      <p-button label="Add Customer" icon="pi pi-plus" (onClick)="store.openCreateForm()" />
-    </div>
-  </div>
+  <h1 class="page-title">Customers</h1>
 
-  <!-- Main card -->
-  <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-    <div class="border-b border-slate-100 px-4 py-4 sm:px-5">
-      <app-customer-toolbar
-        [searchValue]="store.searchTerm()"
-        (searchChange)="onSearchInput($event)"
-        (searchCleared)="onSearchCleared()"
-      />
-    </div>
+  <!-- Search + filter toolbar -->
+  <app-customer-toolbar
+    [searchValue]="store.searchTerm()"
+    (searchChange)="onSearchInput($event)"
+    (searchCleared)="onSearchCleared()"
+  />
 
-    <!-- Load warning -->
-    @if (store.loadWarning()) {
-      <div
-        class="flex items-start gap-2.5 border-b border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-800"
-        role="status"
-      >
-        <i class="pi pi-exclamation-triangle mt-0.5" aria-hidden="true"></i>
-        <div>{{ store.loadWarning() }}</div>
-      </div>
-    }
-
-    <!-- Error state -->
-    @if (store.error() && !store.loading()) {
-      <div class="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center" role="alert">
-        <div
-          class="flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-500"
-          aria-hidden="true"
-        >
-          <i class="pi pi-exclamation-circle text-2xl"></i>
-        </div>
-        <div>
-          <div class="text-base font-semibold text-slate-800">We couldn't load your customers</div>
-          <p class="mx-auto mt-1 max-w-md text-sm text-slate-500">{{ store.error() }}</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <p-button label="Try again" icon="pi pi-refresh" size="small" (onClick)="reload()" />
-          <p-button
-            label="Clear search & filters"
-            icon="pi pi-filter-slash"
-            [text]="true"
-            size="small"
-            (onClick)="resetAndReload()"
-            [disabled]="!store.hasServerSearch() && !store.hasFilters()"
-          />
-        </div>
-      </div>
-    }
-
-    <!-- Table -->
-    @if (!(store.error() && !store.loading())) {
-      <app-customer-table (deleteRequested)="onDeleteRequested($event)" />
-    }
-  </div>
-
-  <!-- Paginator -->
-  @if (!store.error() && store.hasRecords()) {
-    <p-paginator
-      [first]="(store.page() - 1) * store.pageSize()"
-      [rows]="store.pageSize()"
-      [totalRecords]="store.sortedRecords().length"
-      [rowsPerPageOptions]="pageSizeOptions"
-      [pageLinkSize]="3"
-      [showFirstLastIcon]="true"
-      [showCurrentPageReport]="true"
-      currentPageReportTemplate="Showing {first} to {last} of {totalRecords} customers"
-      styleClass="!rounded-xl !border !border-slate-200 !bg-white !shadow-sm"
-      (onPageChange)="onPageChange($event)"
+  <!-- Primary actions -->
+  <div class="flex flex-wrap items-center gap-2.5">
+    <p-button
+      label="Add Customer"
+      icon="pi pi-plus"
+      styleClass="add-customer-btn !h-9 !rounded-md !px-3.5 !text-[13px] !font-semibold"
+      (onClick)="store.openCreateForm()"
     />
+    <button
+      type="button"
+      class="export-button"
+      (click)="exportExcel()"
+      [disabled]="store.sortedRecords().length === 0"
+    >
+      <i class="pi pi-file-excel" aria-hidden="true"></i>
+      Export Excel
+    </button>
+  </div>
+
+  <!-- Load warning -->
+  @if (store.loadWarning()) {
+    <div
+      class="flex items-start gap-2.5 border-b border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-800"
+      role="status"
+    >
+      <i class="pi pi-exclamation-triangle mt-0.5" aria-hidden="true"></i>
+      <div>{{ store.loadWarning() }}</div>
+    </div>
+  }
+
+  <!-- Error state -->
+  @if (store.error() && !store.loading()) {
+    <div
+      class="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center"
+      role="alert"
+    >
+      <div
+        class="flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-500"
+        aria-hidden="true"
+      >
+        <i class="pi pi-exclamation-circle text-2xl"></i>
+      </div>
+      <div>
+        <div class="text-base font-semibold text-slate-800">We couldn't load your customers</div>
+        <p class="mx-auto mt-1 max-w-md text-sm text-slate-500">{{ store.error() }}</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <p-button label="Try again" icon="pi pi-refresh" size="small" (onClick)="reload()" />
+        <p-button
+          label="Clear search & filters"
+          icon="pi pi-filter-slash"
+          [text]="true"
+          size="small"
+          (onClick)="resetAndReload()"
+          [disabled]="!store.hasServerSearch() && !store.hasFilters()"
+        />
+      </div>
+    </div>
+  }
+
+  <!-- Table + pagination footer -->
+  @if (!(store.error() && !store.loading())) {
+    <div class="table-card">
+      <app-customer-table (deleteRequested)="onDeleteRequested($event)" />
+
+      @if (!store.error() && store.hasRecords()) {
+        <div class="table-footer">
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-2">
+            <span class="report-label">
+              Showing {{ store.pageStartIndex() }} to {{ store.pageEndIndex() }} of
+              {{ totalLabel() }} results
+            </span>
+            <select
+              class="page-size"
+              [ngModel]="store.pageSize()"
+              (ngModelChange)="changePageSize($event)"
+              aria-label="Items per page"
+            >
+              @for (option of pageSizeOptions; track option) {
+                <option [ngValue]="option">{{ option }}</option>
+              }
+            </select>
+            <span class="page-size-label">Items per page</span>
+          </div>
+
+          <div class="pagination-buttons">
+            <button
+              type="button"
+              class="pg-btn"
+              (click)="goToPage(1)"
+              [disabled]="store.page() === 1 || store.loading()"
+            >
+              First
+            </button>
+            <button
+              type="button"
+              class="pg-btn"
+              (click)="goToPage(store.page() - 1)"
+              [disabled]="store.page() === 1 || store.loading()"
+            >
+              Previous
+            </button>
+            @for (pageNum of pageLinks(); track pageNum) {
+              <button
+                type="button"
+                class="pg-num"
+                [class.active]="pageNum === store.page()"
+                (click)="goToPage(pageNum)"
+                [disabled]="store.loading()"
+              >
+                {{ pageNum }}
+              </button>
+            }
+            <button
+              type="button"
+              class="pg-btn"
+              (click)="goToPage(store.page() + 1)"
+              [disabled]="store.page() === store.totalPages() || store.loading()"
+            >
+              Next
+            </button>
+            <button
+              type="button"
+              class="pg-btn"
+              (click)="goToPage(store.totalPages())"
+              [disabled]="store.page() === store.totalPages() || store.loading()"
+            >
+              Last
+            </button>
+            <button
+              type="button"
+              class="pg-refresh"
+              [class.spinning]="store.loading()"
+              [attr.aria-busy]="store.loading()"
+              (click)="reload()"
+              aria-label="Refresh"
+              [pTooltip]="'Refresh'"
+              tooltipPosition="top"
+            >
+              <i class="pi pi-refresh" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+      }
+    </div>
   }
 
   <!-- Actions -->

@@ -24,15 +24,24 @@ import {
 import {
   CustomerFilters,
   CustomerFilterKey,
+  CustomerFilterOperator,
   CustomerQuery,
   CustomerSortField,
   CustomerTextFilterKey,
+  DEFAULT_TEXT_OPERATOR,
   EMPTY_CUSTOMER_FILTERS,
   SortDirection,
   hasActiveCategoricalFilters,
+  hasActiveTextFilters,
   hasAnyFilter,
   isCustomerQueryEqual,
 } from '@features/customers/models/customer-query.model';
+import {
+  CUSTOMER_COLUMNS,
+  CustomerColumnDef,
+  CustomerFieldKey,
+  createDefaultHiddenColumns,
+} from '@features/customers/models/customer-column.model';
 import { SaveCustomerResult } from '@features/customers/models/customer-response.model';
 import { CustomerService } from '@features/customers/services/customer.service';
 
@@ -69,11 +78,25 @@ export class CustomerStore {
   // --- Query state ----------------------------------------------------------
   readonly searchTerm = signal('');
   readonly textFilters = signal<Partial<Record<CustomerTextFilterKey, string>>>({});
+  readonly textFilterOperators = signal<
+    Partial<Record<CustomerTextFilterKey, CustomerFilterOperator>>
+  >({});
   readonly filters = signal<CustomerFilters>({ ...EMPTY_CUSTOMER_FILTERS });
   readonly page = signal(1);
   readonly pageSize = signal(environment.customers.defaultPageSize);
   readonly sortField = signal<CustomerSortField | null>(null);
   readonly sortDirection = signal<SortDirection>('asc');
+
+  // --- Column presentation state ---------------------------------------------
+  readonly allColumnDefs = signal<CustomerColumnDef[]>([...CUSTOMER_COLUMNS]);
+  readonly hiddenColumns = signal<ReadonlySet<CustomerFieldKey>>(createDefaultHiddenColumns());
+  readonly selectedColumnDefs = computed(() =>
+    this.allColumnDefs().filter((column) => !this.hiddenColumns().has(column.field)),
+  );
+  readonly filterableColumnDefs = computed(() =>
+    this.selectedColumnDefs().filter((column) => column.filter !== undefined),
+  );
+  readonly visibleColumnCount = computed(() => this.selectedColumnDefs().length);
 
   // --- UI state -------------------------------------------------------------
   readonly selectedCustomer = signal<CustomerRecord | null>(null);
@@ -133,14 +156,35 @@ export class CustomerStore {
     });
   });
 
+  /**
+   * Client-side operator refinement over the server-filtered set.
+   *
+   * The API only exposes free-text (`Text`), so the operator chosen in the
+   * filter panel (contains / equals / starts with / numeric comparisons) is
+   * enforced here on the loaded matching set.
+   */
+  readonly operatorFilteredRecords = computed<CustomerRecord[]>(() => {
+    const records = this.categoricalFilteredRecords();
+    const values = this.textFilters();
+    if (!hasActiveTextFilters(values)) {
+      return records;
+    }
+    const operators = this.textFilterOperators();
+    return records.filter((record) =>
+      TEXT_FILTER_KEYS.every((key) =>
+        matchesFilterOperator(record, key, values[key], operators[key]),
+      ),
+    );
+  });
+
   readonly sortedRecords = computed<CustomerRecord[]>(() => {
     const field = this.sortField();
     const direction = this.sortDirection();
     if (!field) {
-      return this.categoricalFilteredRecords();
+      return this.operatorFilteredRecords();
     }
     const multiplier = direction === 'asc' ? 1 : -1;
-    return [...this.categoricalFilteredRecords()].sort((a, b) => {
+    return [...this.operatorFilteredRecords()].sort((a, b) => {
       const aValue = a[field];
       const bValue = b[field];
       const comparison = String(aValue ?? '').localeCompare(String(bValue ?? ''), undefined, {
@@ -271,22 +315,71 @@ export class CustomerStore {
   }
 
   // --- Text filters (server-side via the `Text` parameter) -------------------
-  setTextFilter(key: CustomerTextFilterKey, value: string): void {
+  setTextFilter(
+    key: CustomerTextFilterKey,
+    value: string,
+    operator?: CustomerFilterOperator,
+  ): void {
     const current = { ...this.textFilters() };
+    const operators = { ...this.textFilterOperators() };
     if ((value ?? '').trim()) {
       current[key] = value.trim();
+      operators[key] = operator ?? operators[key] ?? DEFAULT_TEXT_OPERATOR;
     } else {
       delete current[key];
+      delete operators[key];
     }
     this.textFilters.set(current);
+    this.textFilterOperators.set(operators);
     this.page.set(1);
     this.reloadSource$.next();
   }
 
+  /** Applies a complete text/numeric filter row (field + operator + value). */
+  applyTextFilter(
+    key: CustomerTextFilterKey,
+    operator: CustomerFilterOperator,
+    value: string,
+  ): void {
+    this.setTextFilter(key, value, operator);
+  }
+
+  /** Removes a single text filter (and its operator). */
+  clearTextFilter(key: CustomerTextFilterKey): void {
+    this.setTextFilter(key, '');
+  }
+
   clearTextFilters(): void {
     this.textFilters.set({});
+    this.textFilterOperators.set({});
     this.page.set(1);
     this.reloadSource$.next();
+  }
+
+  // --- Column visibility -------------------------------------------------------
+  isColumnVisible(field: CustomerFieldKey): boolean {
+    return !this.hiddenColumns().has(field);
+  }
+
+  /** Shows/hides one column. At least one column must stay visible. */
+  setColumnVisible(field: CustomerFieldKey, visible: boolean): void {
+    this.hiddenColumns.update((hidden) => {
+      const next = new Set(hidden);
+      if (visible) {
+        next.delete(field);
+      } else {
+        if (this.selectedColumnDefs().length <= 1) {
+          return hidden;
+        }
+        next.add(field);
+      }
+      return next;
+    });
+  }
+
+  /** Restores the reference grid's default column selection. */
+  resetColumns(): void {
+    this.hiddenColumns.set(createDefaultHiddenColumns());
   }
 
   // --- Categorical filters (over the loaded set — API limitation) -----------
@@ -382,7 +475,10 @@ export class CustomerStore {
    * no duplicate requests hit the network.
    */
   private executeQuery(query: CustomerQuery): Observable<CustomerListResult> {
-    if (this.loading() || (this.lastExecutedQuery !== null && isCustomerQueryEqual(this.lastExecutedQuery, query))) {
+    if (
+      this.loading() ||
+      (this.lastExecutedQuery !== null && isCustomerQueryEqual(this.lastExecutedQuery, query))
+    ) {
       return EMPTY;
     }
 
@@ -438,4 +534,73 @@ function messageFrom(error: unknown): string {
     return error.message;
   }
   return 'Unexpected error';
+}
+
+const TEXT_FILTER_KEYS: readonly CustomerTextFilterKey[] = [
+  'id',
+  'code',
+  'name',
+  'email',
+  'mobile',
+];
+
+/** Record field each text filter key targets. */
+const TEXT_FILTER_FIELDS: Record<CustomerTextFilterKey, CustomerFieldKey> = {
+  id: 'id',
+  code: 'code',
+  name: 'commercialName',
+  email: 'email',
+  mobile: 'mobile',
+};
+
+/**
+ * Applies a filter operator to a single record. Numeric comparisons are used
+ * when the target field is numeric (ID); everything else is string matching.
+ */
+function matchesFilterOperator(
+  record: CustomerRecord,
+  key: CustomerTextFilterKey,
+  rawValue: string | undefined,
+  operator: CustomerFilterOperator | undefined,
+): boolean {
+  const value = (rawValue ?? '').trim();
+  if (!value) {
+    return true;
+  }
+  const fieldValue = record[TEXT_FILTER_FIELDS[key]];
+  if (key === 'id') {
+    const needle = Number(value);
+    if (!Number.isFinite(needle)) {
+      return true;
+    }
+    const actual = Number(fieldValue);
+    switch (operator) {
+      case 'greaterThan':
+        return actual > needle;
+      case 'greaterThanOrEqual':
+        return actual >= needle;
+      case 'lessThan':
+        return actual < needle;
+      case 'lessThanOrEqual':
+        return actual <= needle;
+      case 'equals':
+        return actual === needle;
+      default:
+        return String(actual).includes(String(needle));
+    }
+  }
+  const text = String(fieldValue ?? '');
+  const lowerNeedle = value.toLowerCase();
+  const lowerText = text.toLowerCase();
+  switch (operator) {
+    case 'equals':
+      return lowerText === lowerNeedle;
+    case 'startsWith':
+      return lowerText.startsWith(lowerNeedle);
+    case 'endsWith':
+      return lowerText.endsWith(lowerNeedle);
+    case 'contains':
+    default:
+      return lowerText.includes(lowerNeedle);
+  }
 }

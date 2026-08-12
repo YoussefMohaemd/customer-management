@@ -19,11 +19,13 @@ export class MainLayoutComponent {
   protected readonly desktopCollapsed = signal(false);
   protected readonly mobileOpen = signal(false);
 
+  /** Topbar hamburger — only visible on small screens, opens the drawer. */
   protected onMenuToggle(): void {
-    if (window.matchMedia('(min-width: 1024px)').matches) {
-      this.desktopCollapsed.update((value) => !value);
-    } else {
-      this.mobileOpen.set(true);
-    }
+    this.mobileOpen.set(true);
+  }
+
+  /** Sidebar collapse arrow — desktop only, toggles the icon rail. */
+  protected onDesktopCollapse(): void {
+    this.desktopCollapsed.update((value) => !value);
   }
 }
