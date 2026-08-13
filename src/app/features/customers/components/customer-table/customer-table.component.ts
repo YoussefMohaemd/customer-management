@@ -33,6 +33,11 @@ const AVATAR_PALETTE: readonly string[] = [
  * Columns dropdown. Headers are plain visual headers — they never trigger
  * filtering or sorting; all filtering flows through the Filter panel.
  *
+ * When the active action requires a selection, a checkbox column appears
+ * (header = select current page, rows = individual toggles). Selection is
+ * owned by the store and keyed by stable customer id, so it survives
+ * pagination.
+ *
  * Pure view: consumes signals from the store and emits typed outputs for
  * anything a parent must orchestrate (e.g. delete confirmation).
  */
@@ -48,7 +53,22 @@ export class CustomerTableComponent {
 
   readonly deleteRequested = output<CustomerRecord>();
 
-  protected readonly colspan = computed(() => this.store.selectedColumnDefs().length + 1);
+  protected readonly colspan = computed(
+    () =>
+      this.store.selectedColumnDefs().length +
+      (this.store.selectionEnabled() ? 1 : 0) +
+      1,
+  );
+
+  /**
+   * Rows of the loading skeleton. Mirrors the real grid's structure (one row
+   * per pageSize item, capped for very large page sizes) so the loading state
+   * never destroys the table layout.
+   */
+  protected readonly skeletonRows = computed(() => {
+    const size = Math.min(Math.max(1, this.store.pageSize()), 10);
+    return Array.from({ length: size }, (_, index) => index);
+  });
 
   protected readonly onView = (customer: CustomerRecord): void => this.store.openViewForm(customer);
   protected readonly onEdit = (customer: CustomerRecord): void => this.store.openEditForm(customer);

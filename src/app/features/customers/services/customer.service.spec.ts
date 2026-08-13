@@ -27,13 +27,16 @@ describe('CustomerService', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  it('GETs ReadAllCRMClients with the verified query parameters', () => {
+  it('GETs ReadAllCRMClients with the documented query parameters only', () => {
     service.fetchCustomers({ ...createEmptyCustomerQuery(), search: 'salma' }).subscribe();
 
     const request = http.expectOne((req) => req.method === 'GET' && req.url === `${READ_URL}`);
     expect(request.request.params.get('Text')).toBe('salma');
     expect(request.request.params.get('Direction')).toBe('ltr');
     expect(request.request.params.get('InCT')).toBe('');
+    // The Postman collection documents exactly these three parameters — the
+    // request must never invent pagination/sort/filter params.
+    expect(request.request.params.keys().sort()).toEqual(['Direction', 'InCT', 'Text']);
 
     request.flush({ Data: [{ Id: 1, Name: 'Acme' }], Total: 14104 });
   });
@@ -42,7 +45,7 @@ describe('CustomerService', () => {
     let records: CustomerListResult | undefined;
     service.fetchCustomers(createEmptyCustomerQuery()).subscribe((result) => (records = result));
 
-    const request = http.expectOne(`${READ_URL}`);
+    const request = http.expectOne((req) => req.url === READ_URL);
     request.flush({
       Data: [
         {
@@ -64,17 +67,53 @@ describe('CustomerService', () => {
     expect(records?.records[0].accountTypeId).toBeNull();
   });
 
-  it('composes free-text filter terms into the server Text parameter', () => {
+  it('sends ONLY the search-box term as Text (per-field filters stay client-side)', () => {
     service
       .fetchCustomers({
         ...createEmptyCustomerQuery(),
         search: 'acme',
         textFilters: { name: 'acme co', code: 'C-1' },
+        filters: { clientTypeId: 12, accountManagerId: 4, cityId: 7, countryId: 2 },
       })
       .subscribe();
 
-    const request = http.expectOne(`${READ_URL}`);
-    expect(request.request.params.get('Text')).toBe('acme name:acme co code:C-1');
+    const request = http.expectOne((req) => req.url === READ_URL);
+    expect(request.request.params.get('Text')).toBe('acme');
+    // The legacy API has no filter params; nothing else may be sent.
+    expect(request.request.params.keys().sort()).toEqual(['Direction', 'InCT', 'Text']);
+    request.flush({ Data: [], Total: 0 });
+  });
+
+  it('sends the proposed paged contract when serverPagination is enabled', () => {
+    const original = environment.customers.serverPagination;
+    environment.customers.serverPagination = true;
+    try {
+      service
+        .fetchCustomers({
+          ...createEmptyCustomerQuery(),
+          search: 'john',
+          page: 2,
+          pageSize: 50,
+          sortField: 'accountManagerName',
+          sortDirection: 'desc',
+          filters: { clientTypeId: 12, accountManagerId: 4, cityId: 7, countryId: 2 },
+        })
+        .subscribe();
+
+      const request = http.expectOne((req) => req.url === READ_URL);
+      expect(request.request.params.get('Text')).toBe('john');
+      expect(request.request.params.get('Page')).toBe('2');
+      expect(request.request.params.get('PageSize')).toBe('50');
+      expect(request.request.params.get('SortField')).toBe('AccountManagerName');
+      expect(request.request.params.get('SortDirection')).toBe('desc');
+      expect(request.request.params.get('ClientTypeId')).toBe('12');
+      expect(request.request.params.get('AccountManagerId')).toBe('4');
+      expect(request.request.params.get('CityId')).toBe('7');
+      expect(request.request.params.get('CountryId')).toBe('2');
+      request.flush({ Data: [], Total: 120 });
+    } finally {
+      environment.customers.serverPagination = original;
+    }
   });
 
   it('POSTs the Save payload and maps the {Result, ErrorMessage} response', () => {
@@ -183,10 +222,12 @@ describe('CustomerService', () => {
       error: (error: unknown) => (thrown = error as Error),
     });
 
-    http.expectOne(`${READ_URL}`).flush(null, {
-      status: 401,
-      statusText: 'Unauthorized',
-    });
+    http
+      .expectOne((req) => req.url === READ_URL)
+      .flush(null, {
+        status: 401,
+        statusText: 'Unauthorized',
+      });
 
     expect(thrown?.message).toContain('not authorized');
   });

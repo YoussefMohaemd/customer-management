@@ -66,7 +66,9 @@ describe('CustomerReportsComponent', () => {
     const button = fixture.nativeElement.querySelectorAll('button')[0];
     button?.click();
 
-    expect(addSpy).toHaveBeenCalledWith(expect.objectContaining({ summary: 'Reports' }));
+    expect(addSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ summary: 'Customer List' }),
+    );
   });
 });
 

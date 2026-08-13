@@ -16,5 +16,7 @@ export const environment: Environment = {
     pageSizeOptions: [5, 10, 20, 30],
     searchDebounceMs: 400,
     maxRecordsToLoad: 50000,
+    cacheTtlMs: 300_000,
+    serverPagination: false,
   },
 };

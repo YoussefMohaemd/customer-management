@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
@@ -10,6 +18,7 @@ import { CustomerColumnPickerComponent } from '@features/customers/components/cu
 import {
   CustomerFilterKey,
   CustomerTextFilterKey,
+  isTextFilterKey,
 } from '@features/customers/models/customer-query.model';
 
 interface FilterChip {
@@ -17,21 +26,6 @@ interface FilterChip {
   label: string;
   value: string;
 }
-
-const TEXT_FILTER_LABELS: Record<CustomerTextFilterKey, string> = {
-  id: 'ID',
-  code: 'Code',
-  name: 'Name',
-  email: 'Email',
-  mobile: 'Mobile',
-};
-
-const CATEGORICAL_FILTER_LABELS: Record<CustomerFilterKey, string> = {
-  clientTypeId: 'Client Type',
-  accountManagerId: 'Account Manager',
-  cityId: 'City',
-  countryId: 'Country',
-};
 
 /**
  * Search + filter strip above the table. Presentational: raw search values
@@ -59,45 +53,28 @@ export class CustomerToolbarComponent {
 
   protected readonly store = inject(CustomerStore);
 
+  /** Whether the filter panel (rendered below the toolbar row) is open. */
+  protected readonly filtersPanelOpen = signal(false);
+
+  /** One chip per active filter value — derived, never duplicated state. */
   protected readonly activeChips = computed<FilterChip[]>(() => {
     const chips: FilterChip[] = [];
-    const textFilters = this.store.textFilters();
-    for (const [key, value] of Object.entries(textFilters) as [
-      CustomerTextFilterKey,
-      string | undefined,
-    ][]) {
-      if (value?.trim()) {
-        chips.push({ key, label: TEXT_FILTER_LABELS[key], value: value.trim() });
+    for (const column of this.store.filterableColumnDefs()) {
+      const filter = column.filter!;
+      const key = filter.key;
+      let val = '';
+      if (isTextFilterKey(key)) {
+        val = this.store.textFilters()[key] ?? '';
+      } else {
+        val = this.categoricalLabel(key as CustomerFilterKey);
       }
-    }
-    const filters = this.store.filters();
-    if (filters.clientTypeId !== null) {
-      chips.push({
-        key: 'clientTypeId',
-        label: CATEGORICAL_FILTER_LABELS.clientTypeId,
-        value: this.filterLabel('clientTypeId'),
-      });
-    }
-    if (filters.accountManagerId !== null) {
-      chips.push({
-        key: 'accountManagerId',
-        label: CATEGORICAL_FILTER_LABELS.accountManagerId,
-        value: this.filterLabel('accountManagerId'),
-      });
-    }
-    if (filters.cityId !== null) {
-      chips.push({
-        key: 'cityId',
-        label: CATEGORICAL_FILTER_LABELS.cityId,
-        value: this.filterLabel('cityId'),
-      });
-    }
-    if (filters.countryId !== null) {
-      chips.push({
-        key: 'countryId',
-        label: CATEGORICAL_FILTER_LABELS.countryId,
-        value: this.filterLabel('countryId'),
-      });
+      if (val.trim()) {
+        chips.push({
+          key,
+          label: column.label,
+          value: val,
+        });
+      }
     }
     return chips;
   });
@@ -110,17 +87,26 @@ export class CustomerToolbarComponent {
     this.searchCleared.emit();
   }
 
+  protected toggleFiltersPanel(): void {
+    this.filtersPanelOpen.update((open) => !open);
+  }
+
+  /** Removes a chip: clears its filter value. */
   protected removeChip(key: CustomerTextFilterKey | CustomerFilterKey): void {
     if (isTextFilterKey(key)) {
-      this.store.setTextFilter(key, '');
-    } else {
+      if ((this.store.textFilters()[key] ?? '').trim()) {
+        this.store.setTextFilter(key, '');
+      }
+    } else if (this.store.filters()[key] !== null) {
       this.store.setCategoricalFilter(key, null);
     }
   }
 
-  private filterLabel(key: CustomerFilterKey): string {
-    const filters = this.store.filters();
-    const value = filters[key];
+  private categoricalLabel(key: CustomerFilterKey): string {
+    const value = this.store.filters()[key];
+    if (value === null) {
+      return '';
+    }
     const options = {
       clientTypeId: this.store.clientTypeOptions(),
       accountManagerId: this.store.accountManagerOptions(),
@@ -129,18 +115,4 @@ export class CustomerToolbarComponent {
     }[key];
     return options.find((option) => option.value === value)?.label ?? String(value);
   }
-}
-
-const TEXT_FILTER_KEYS: ReadonlySet<CustomerTextFilterKey> = new Set([
-  'id',
-  'code',
-  'name',
-  'email',
-  'mobile',
-]);
-
-function isTextFilterKey(
-  key: CustomerTextFilterKey | CustomerFilterKey,
-): key is CustomerTextFilterKey {
-  return TEXT_FILTER_KEYS.has(key as CustomerTextFilterKey);
 }

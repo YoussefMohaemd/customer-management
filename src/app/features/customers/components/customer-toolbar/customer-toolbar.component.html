@@ -1,5 +1,5 @@
 <div class="flex flex-col gap-3">
-  <div class="flex flex-wrap items-center gap-2.5">
+  <div class="toolbar-row flex flex-wrap items-center gap-2.5">
     <!-- Server-side search -->
     <div class="relative min-w-[240px] flex-1">
       <input
@@ -26,39 +26,59 @@
       ></i>
     </div>
 
-    <!-- Filter (panel driven by the selected columns) -->
-    <app-customer-filters />
+    <!-- Filter (button only — the panel renders below the toolbar row) -->
+    <button
+      type="button"
+      class="filter-button"
+      [class.open]="filtersPanelOpen()"
+      (click)="toggleFiltersPanel()"
+      [attr.aria-expanded]="filtersPanelOpen()"
+      aria-label="Toggle filters"
+    >
+      <i class="pi pi-filter text-[13px]" aria-hidden="true"></i>
+      <span class="hidden sm:inline">Filter</span>
+      @if (store.totalFilterCount() > 0) {
+        <span class="filter-count" aria-label="{{ store.totalFilterCount() }} active filters">
+          {{ store.totalFilterCount() }}
+        </span>
+      }
+      <i
+        class="pi pi-angle-down text-[10px] text-slate-400 transition-transform duration-150"
+        [class.rotate-180]="filtersPanelOpen()"
+        aria-hidden="true"
+      ></i>
+    </button>
+
+    <!-- Selected filter chips (derived from the active filter state) -->
+    @if (activeChips().length > 0) {
+      <div class="flex flex-wrap items-center gap-1.5">
+        @for (chip of activeChips(); track chip.key) {
+          <span class="filter-chip">
+            <span class="filter-chip-label">{{ chip.label }}</span>
+            @if (chip.value) {
+              <span class="filter-chip-value">: {{ chip.value }}</span>
+            }
+            <button
+              type="button"
+              class="filter-chip-remove"
+              (click)="removeChip(chip.key)"
+              [attr.aria-label]="'Remove ' + chip.label + ' filter'"
+            >
+              <i class="pi pi-times text-[9px]" aria-hidden="true"></i>
+            </button>
+          </span>
+        }
+      </div>
+    }
 
     <!-- Dynamic column selection dropdown -->
     <app-customer-column-picker class="ml-auto" />
   </div>
 
-  <!-- Selected filter chips -->
-  @if (store.totalFilterCount() > 0) {
-    <div class="flex flex-wrap items-center gap-2">
-      <span class="text-xs font-medium text-slate-400">Active filters:</span>
-      @for (chip of activeChips(); track chip.key) {
-        <span
-          class="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 py-1 pl-2.5 pr-1.5 text-xs font-medium text-blue-700"
-        >
-          {{ chip.label }}: {{ chip.value }}
-          <button
-            type="button"
-            (click)="removeChip(chip.key)"
-            class="flex h-4 w-4 items-center justify-center rounded-full text-blue-400 transition hover:bg-blue-100 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
-            [attr.aria-label]="'Remove ' + chip.label + ' filter'"
-          >
-            <i class="pi pi-times text-[9px]"></i>
-          </button>
-        </span>
-      }
-      <button
-        type="button"
-        (click)="store.clearAllFilters()"
-        class="rounded text-xs font-medium text-blue-600 transition hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
-      >
-        Clear all
-      </button>
-    </div>
+  <!-- Filter panel: a separate block underneath the whole toolbar row, never
+       a flex item of the row, so opening it can never move the search,
+       the Filter button or the column dropdown. -->
+  @if (filtersPanelOpen()) {
+    <app-customer-filters />
   }
 </div>

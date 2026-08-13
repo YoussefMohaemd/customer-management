@@ -4,6 +4,7 @@
  * does not implement natively.
  */
 
+import 'zone.js';
 import 'zone.js/testing';
 
 class ResizeObserverStub {

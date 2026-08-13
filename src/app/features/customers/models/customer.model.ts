@@ -1,3 +1,6 @@
+import type { CustomerFieldKey } from './customer-column.model';
+import type { CustomerSortField, SortDirection } from './customer-query.model';
+
 /**
  * Normalized customer record as returned by `ReadAllCRMClients`.
  *
@@ -29,9 +32,7 @@ export interface CustomerRecord {
   clientType: string;
   accountManagerId: number | null;
   accountManagerName: string;
-  classificationId: number | null;
   classificationName: string;
-  businessFieldId: number | null;
   businessFieldName: string;
   regionName: string;
   birthDate: string | null;
@@ -49,6 +50,29 @@ export interface CustomerRecord {
 export interface CustomerListResult {
   records: CustomerRecord[];
   total: number;
+}
+
+/** Action definition that can sync with table state and columns. */
+export interface CustomerActionDef {
+  id: string;
+  icon: string;
+  title: string;
+  description: string;
+  accent: 'blue' | 'amber' | 'emerald';
+  requiredColumns?: readonly CustomerFieldKey[];
+  requiresSelection?: boolean;
+}
+
+/** Report definition that configures table column visibility, filters, and sort. */
+export interface CustomerReportDef {
+  id: string;
+  icon: string;
+  title: string;
+  subtitle: string;
+  accent: string;
+  requiredColumns: readonly CustomerFieldKey[];
+  defaultSortField?: CustomerSortField;
+  defaultSortDirection?: SortDirection;
 }
 
 /** A single row of the `xmlContactPersonGrid` collection sent to the Save API. */
@@ -351,9 +375,7 @@ export function normalizeCustomerRecord(raw: unknown): CustomerRecord | null {
     clientType: pick(record, ['ClientType', 'clientType']),
     accountManagerId: readId(pick(record, ['AccountManagerId', 'accountManagerId'])),
     accountManagerName: pick(record, ['AccountManagerName', 'accountManagerName']),
-    classificationId: readId(pick(record, ['ClassificationId', 'classificationId'])),
     classificationName: pick(record, ['ClassificationNam', 'ClassificationName', 'classificationName']),
-    businessFieldId: readId(pick(record, ['BusinessFieldId', 'businessFieldId'])),
     businessFieldName: pick(record, ['BusinessFieldName', 'businessFieldName']),
     regionName: pick(record, ['RegionName', 'regionName']),
     birthDate: readDate(pick(record, ['BirthDate', 'birthDate'])),
@@ -381,28 +403,33 @@ export function normalizeCustomerRecord(raw: unknown): CustomerRecord | null {
  */
 export function normalizeCustomerList(raw: unknown): CustomerListResult {
   if (Array.isArray(raw)) {
-    return { records: normalizeArray(raw), total: raw.length };
+    const records = normalizeArray(raw);
+    return { records, total: records.length };
   }
   if (typeof raw !== 'object' || raw === null) {
     return { records: [], total: 0 };
   }
 
   const container = raw as Record<string, unknown>;
-  const total = readNumber(container['Total'] ?? container['total'] ?? 0);
+  const totalRaw = readNumber(
+    container['Total'] ?? container['total'] ?? container['totalCount'] ?? container['count'] ?? 0,
+  );
 
   for (const key of COLLECTION_KEYS) {
     const candidate = container[key];
     if (Array.isArray(candidate)) {
-      return { records: normalizeArray(candidate), total };
+      const records = normalizeArray(candidate);
+      return { records, total: Math.max(totalRaw, records.length) };
     }
     if (isRecord(candidate)) {
       const nestedArray = findArrayIn(candidate);
       if (nestedArray.length > 0) {
-        return { records: normalizeArray(nestedArray), total: nestedArray.length };
+        const records = normalizeArray(nestedArray);
+        return { records, total: Math.max(totalRaw, records.length) };
       }
     }
   }
-  return { records: [], total };
+  return { records: [], total: 0 };
 }
 
 function normalizeArray(items: unknown[]): CustomerRecord[] {

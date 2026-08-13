@@ -1,8 +1,10 @@
 <div class="column-control" [class.open]="popoverOpen">
   <!-- Selected columns as removable chips (drag/scroll-only area: clicking
-       it never opens the dropdown — only the arrow trigger does) -->
+       it never opens the dropdown — only the arrow trigger does).
+       Chips always reflect the USER's own column selection; a temporary
+       Action/Report override only affects the table, never this picker. -->
   <div #chipsScroll class="column-chips">
-    @for (column of store.selectedColumnDefs(); track column.field) {
+    @for (column of store.userSelectedColumnDefs(); track column.field) {
       <span class="column-chip" [class.disabled]="isLastVisible(column.field)">
         <span class="column-chip-label">{{ column.label }}</span>
         <button

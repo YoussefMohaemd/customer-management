@@ -1,13 +1,68 @@
 export type SortDirection = 'asc' | 'desc';
 
 export type CustomerSortField =
-  'id' | 'code' | 'commercialName' | 'email' | 'mobile' | 'city' | 'country';
+  | 'id'
+  | 'code'
+  | 'commercialName'
+  | 'nameEn'
+  | 'nameAr'
+  | 'clientType'
+  | 'email'
+  | 'mobile'
+  | 'phone'
+  | 'phone2'
+  | 'fax'
+  | 'website'
+  | 'jobTitle'
+  | 'accountTypeName'
+  | 'accountManagerName'
+  | 'city'
+  | 'country'
+  | 'classificationName'
+  | 'businessFieldName'
+  | 'regionName'
+  | 'gender'
+  | 'status'
+  | 'birthDate'
+  | 'registrationDate'
+  | 'createdDate'
+  | 'address'
+  | 'comment'
+  | 'taxFileNumber'
+  | 'commercialRegistrationNumber'
+  | 'vatRegistrationNumber';
 
 /** Categorical filters applied over the loaded collection (see README — API limitation). */
 export type CustomerFilterKey = 'clientTypeId' | 'accountManagerId' | 'cityId' | 'countryId';
 
 /** Text filters composed into the server-side `Text` search parameter. */
-export type CustomerTextFilterKey = 'id' | 'code' | 'name' | 'email' | 'mobile';
+export type CustomerTextFilterKey =
+  | 'id'
+  | 'code'
+  | 'name'
+  | 'nameEn'
+  | 'nameAr'
+  | 'email'
+  | 'mobile'
+  | 'phone'
+  | 'phone2'
+  | 'fax'
+  | 'website'
+  | 'jobTitle'
+  | 'clientType'
+  | 'classificationName'
+  | 'businessFieldName'
+  | 'regionName'
+  | 'gender'
+  | 'status'
+  | 'birthDate'
+  | 'registrationDate'
+  | 'createdDate'
+  | 'address'
+  | 'comment'
+  | 'taxFileNumber'
+  | 'commercialRegistrationNumber'
+  | 'vatRegistrationNumber';
 
 /** Operators available for free-text filter values. */
 export type CustomerTextOperator = 'contains' | 'equals' | 'startsWith' | 'endsWith';
@@ -28,6 +83,119 @@ export const TEXT_OPERATORS: readonly CustomerTextOperator[] = [
   'startsWith',
   'endsWith',
 ];
+
+/** Every filterable field in canonical display order (text first, then categorical). */
+export const CUSTOMER_FILTER_KEYS: readonly (CustomerTextFilterKey | CustomerFilterKey)[] = [
+  'id',
+  'code',
+  'name',
+  'nameEn',
+  'nameAr',
+  'email',
+  'mobile',
+  'phone',
+  'phone2',
+  'fax',
+  'website',
+  'jobTitle',
+  'clientType',
+  'classificationName',
+  'businessFieldName',
+  'regionName',
+  'gender',
+  'status',
+  'birthDate',
+  'registrationDate',
+  'createdDate',
+  'address',
+  'comment',
+  'taxFileNumber',
+  'commercialRegistrationNumber',
+  'vatRegistrationNumber',
+  'clientTypeId',
+  'accountManagerId',
+  'cityId',
+  'countryId',
+];
+
+/** Display labels for every filterable field. */
+export const CUSTOMER_FILTER_LABELS: Record<CustomerTextFilterKey | CustomerFilterKey, string> = {
+  id: 'ID',
+  code: 'Code',
+  name: 'Name',
+  nameEn: 'English Name',
+  nameAr: 'Arabic Name',
+  email: 'Email',
+  mobile: 'Mobile',
+  phone: 'Phone',
+  phone2: 'Phone 2',
+  fax: 'Fax',
+  website: 'Website',
+  jobTitle: 'Job Title',
+  clientType: 'Client Type (raw)',
+  classificationName: 'Classification',
+  businessFieldName: 'Business Field',
+  regionName: 'Region',
+  gender: 'Gender',
+  status: 'Status',
+  birthDate: 'Birth Date',
+  registrationDate: 'Registration Date',
+  createdDate: 'Created Date',
+  address: 'Address',
+  comment: 'Comment',
+  taxFileNumber: 'Tax File Number',
+  commercialRegistrationNumber: 'Commercial Reg. No.',
+  vatRegistrationNumber: 'VAT Reg. No.',
+  clientTypeId: 'Client Type',
+  accountManagerId: 'Account Manager',
+  cityId: 'City',
+  countryId: 'Country',
+};
+
+/** Every free-text filter key in canonical display order (single source of truth). */
+export const TEXT_FILTER_KEYS: readonly CustomerTextFilterKey[] = [
+  'id',
+  'code',
+  'name',
+  'nameEn',
+  'nameAr',
+  'email',
+  'mobile',
+  'phone',
+  'phone2',
+  'fax',
+  'website',
+  'jobTitle',
+  'clientType',
+  'classificationName',
+  'businessFieldName',
+  'regionName',
+  'gender',
+  'status',
+  'birthDate',
+  'registrationDate',
+  'createdDate',
+  'address',
+  'comment',
+  'taxFileNumber',
+  'commercialRegistrationNumber',
+  'vatRegistrationNumber',
+];
+
+/** Every categorical filter key (single source of truth). */
+export const CATEGORICAL_FILTER_KEYS: readonly CustomerFilterKey[] = [
+  'clientTypeId',
+  'accountManagerId',
+  'cityId',
+  'countryId',
+];
+
+/** True when a filter key addresses a free-text value rather than a categorical one. */
+export function isTextFilterKey(
+  key: CustomerTextFilterKey | CustomerFilterKey,
+): key is CustomerTextFilterKey {
+  return !['clientTypeId', 'accountManagerId', 'cityId', 'countryId'].includes(key);
+}
 
 export const NUMERIC_OPERATORS: readonly CustomerNumericOperator[] = [
   'equals',
@@ -100,44 +268,54 @@ export function createEmptyCustomerQuery(): CustomerQuery {
 }
 
 /**
- * Composes the runtime search terms for the Read API `Text` parameter.
- * The backend exposes a single free-text parameter, therefore all free-text
- * filter terms are combined into one server-side search expression.
+ * Composes the `Text` parameter for the Read API.
+ *
+ * The staging backend exposes a single free-text search parameter that is
+ * matched against the customer fields as a plain substring. Per-field text
+ * filters are therefore NOT injected here: prefixing values like
+ * `email:foo` or joining multiple terms makes the server search for that
+ * literal string and returns zero rows (verified against the live API).
+ * The search box term is the only server-side text narrowing; per-field
+ * text filters are applied client-side over the returned set.
  */
 export function composeServerSearchText(
   search: string,
-  textFilters: Partial<Record<CustomerTextFilterKey, string>>,
+  _textFilters: Partial<Record<CustomerTextFilterKey, string>>,
 ): string {
-  const parts: string[] = [];
-  if (search.trim()) {
-    parts.push(search.trim());
-  }
-  for (const [key, value] of Object.entries(textFilters)) {
-    const text = (value ?? '').trim();
-    if (text) {
-      parts.push(`${key}:${text}`);
-    }
-  }
-  return parts.join(' ');
+  return search.trim();
 }
 
 export function isCustomerQueryEqual(a: CustomerQuery, b: CustomerQuery): boolean {
-  return (
-    a.search === b.search &&
-    a.page === b.page &&
-    a.pageSize === b.pageSize &&
-    a.sortField === b.sortField &&
-    a.sortDirection === b.sortDirection &&
-    a.textFilters.id === b.textFilters.id &&
-    a.textFilters.code === b.textFilters.code &&
-    a.textFilters.name === b.textFilters.name &&
-    a.textFilters.email === b.textFilters.email &&
-    a.textFilters.mobile === b.textFilters.mobile &&
-    a.filters.clientTypeId === b.filters.clientTypeId &&
-    a.filters.accountManagerId === b.filters.accountManagerId &&
-    a.filters.cityId === b.filters.cityId &&
-    a.filters.countryId === b.filters.countryId
-  );
+  if (
+    a.search !== b.search ||
+    a.page !== b.page ||
+    a.pageSize !== b.pageSize ||
+    a.sortField !== b.sortField ||
+    a.sortDirection !== b.sortDirection
+  ) {
+    return false;
+  }
+
+  // Compare categorical filters
+  if (
+    a.filters.clientTypeId !== b.filters.clientTypeId ||
+    a.filters.accountManagerId !== b.filters.accountManagerId ||
+    a.filters.cityId !== b.filters.cityId ||
+    a.filters.countryId !== b.filters.countryId
+  ) {
+    return false;
+  }
+
+  // Compare text filters dynamically
+  const keys = new Set([...Object.keys(a.textFilters), ...Object.keys(b.textFilters)]);
+  for (const k of keys) {
+    const key = k as CustomerTextFilterKey;
+    if ((a.textFilters[key] ?? '').trim() !== (b.textFilters[key] ?? '').trim()) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export function hasActiveTextFilters(

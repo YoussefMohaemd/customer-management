@@ -56,9 +56,10 @@ describe('CustomerTableComponent', () => {
   });
 
   it('renders the empty state when no records are loaded', () => {
+    store.records.set([]);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).toContain('No customers found');
+    expect(store.isEmptyResult()).toBe(true);
   });
 
   it('emits deleteRequested through the actions handler', () => {

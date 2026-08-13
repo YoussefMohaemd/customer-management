@@ -58,9 +58,7 @@ export class CustomerPageComponent implements OnInit {
 
   protected readonly pageSizeOptions = environment.customers.pageSizeOptions;
 
-  protected readonly totalLabel = computed(() =>
-    this.store.sortedRecords().length.toLocaleString(),
-  );
+  protected readonly totalLabel = computed(() => this.store.totalRecords().toLocaleString());
 
   /** Up to 5 page links, sliding around the current page. */
   protected readonly pageLinks = computed<number[]>(() => {

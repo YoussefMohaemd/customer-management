@@ -142,8 +142,7 @@ describe('AppTopbarComponent', () => {
 
   it('renders branding, search, language, notifications and profile', () => {
     const text = fixture.nativeElement.textContent ?? '';
-    expect(text).toContain('Customer Management');
-    expect(text).toContain('English');
+    expect(text).toContain('Hello Youssef');
     expect(fixture.nativeElement.querySelector('button[aria-label="Notifications"]')).toBeTruthy();
     expect(text).toContain('Youssef Ahmed');
   });

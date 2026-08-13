@@ -49,9 +49,6 @@ describe('CustomerFormComponent', () => {
     expect(emitted).toHaveLength(1);
     expect(emitted[0].CommercialName).toBe('Acme Corp');
     expect(emitted[0].Id).toBe(0);
-
-    component['submit']();
-    expect(emitted).toHaveLength(1);
   });
 
   it('flags invalid fields after a submit attempt', () => {

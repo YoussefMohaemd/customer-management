@@ -53,19 +53,19 @@ The UI intentionally replicates the supplied assessment screenshots: dark ERP si
 
 ## Features
 
-| Area          | Detail                                                                         |
-| ------------- | ------------------------------------------------------------------------------ |
-| Data grid     | PrimeNG table, compact enterprise styling, hover/loading/empty states          |
-| Search        | Server-side `Text` parameter, 400 ms debounce, request cancellation            |
-| Filters       | Free-text (server-side) + categorical (client-side over loaded set) with chips |
-| Pagination    | Displayed page extracted from the loaded matching set; 100k+ safe              |
-| Sorting       | Any column, asc/desc, resets to page 1                                         |
-| Create / Edit | Shared reactive form, validation, `SaveCustomerWithContactPerson`              |
-| Actions menu  | View / Edit / Delete + disabled placeholders for unavailable modules           |
-| Export        | SheetJS Excel export of the current filtered + sorted result set               |
-| Responsive    | Sidebar collapse + mobile drawer, 4→2→1 column form grid                       |
-| Errors        | Interceptor-normalized user-friendly messages for all HTTP statuses            |
-| State         | Angular Signals store, `computed()` derived state, `OnPush` rendering          |
+| Area          | Detail                                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Data grid     | PrimeNG table, compact enterprise styling, hover/loading/empty states                                               |
+| Search        | Server-side `Text` parameter, 400 ms debounce, request cancellation                                                 |
+| Filters       | Free-text + categorical filters applied over the server-narrowed set, with chips; only `Text` is served server-side |
+| Pagination    | Displayed page extracted from the loaded matching set; 100k+ safe; server-paged mode ready via config flag          |
+| Sorting       | Any column, asc/desc, resets to page 1                                                                              |
+| Create / Edit | Shared reactive form, validation, `SaveCustomerWithContactPerson`                                                   |
+| Actions menu  | View / Edit / Delete + disabled placeholders for unavailable modules                                                |
+| Export        | SheetJS Excel export of the current filtered + sorted result set                                                    |
+| Responsive    | Sidebar collapse + mobile drawer, 4→2→1 column form grid                                                            |
+| Errors        | Interceptor-normalized user-friendly messages for all HTTP statuses                                                 |
+| State         | Angular Signals store, `computed()` derived state, `OnPush` rendering                                               |
 
 ## Tech Stack
 
@@ -133,6 +133,7 @@ src/
 | Read customers       | `GET /api/CRM/ReadAllCRMClients?Text=&Direction=ltr&InCT=` |
 | Save (create/update) | `POST /api/CRM/SaveCustomerWithContactPerson?InCT=`        |
 
+- The request contract is verified against the provided Postman collection: `ReadAllCRMClients` documents **exactly three query parameters** — `Text` (server-side free-text search), `Direction`, `InCT`. There are no pagination, sorting or categorical filter parameters, and the API returns the **full matching collection** as `{ "Data": Client[], "Total": number }` (verified live), where `Total` is the count of the full matching set. The app therefore sends only the documented parameters — it never invents `Page`/`PageSize`/`Skip`/`Take`/`SortField`/`SortDirection`/filter-id parameters that the API does not support. See [Proposed Backend Contract](#proposed-backend-contract).
 - Base URL + endpoints live only in `src/environments/*` (swapped per build config via `fileReplacements`).
 - Response bodies are inspected and normalized at the model layer (`normalizeCustomerList`, `normalizeCustomerRecord`, `normalizeSaveCustomerResult`) so the UI depends on stable typed records, not on undocumented payload variants (e.g. the backend returns `CommercialName`/`CommericialName`/`Name` variants — normalization picks the first populated one).
 - The Save payload follows the documented `SaveCustomerWithContactPerson` contract exactly (70+ fields with sane defaults in `createCustomerPayloadDefaults`).
@@ -157,14 +158,14 @@ To run against the staging API: copy the example to `app-config.json` and paste 
 
 ## Server-Side Pagination
 
-**Honest engineering about the API contract:** the provided `ReadAllCRMClients` endpoint exposes only `Text`, `Direction`, and `InCT`. It has **no** `page`/`pageSize`/`skip` parameters, and it returns the full matching collection rather than pagination metadata. Inventing fake pagination parameters would be wrong, so the app does the following:
+**Honest engineering about the API contract:** the provided Postman collection documents `ReadAllCRMClients` with **only** `Text`, `Direction` and `InCT`. It has **no** `page`/`pageSize`/`skip`/`take` parameters, no sort parameters and no categorical filter parameters, and it returns the full matching collection as `{ Data, Total }` rather than pagination metadata. Inventing fake pagination parameters would be wrong, so:
 
-1. The **server** narrows the universe with the free-text `Text` parameter (search + text filters).
-2. The store loads that matching set and derives the visible page **in memory** (slice of `pageSize` per `page`).
-3. **The UI renders at most `pageSize` rows (default 8).** 100,000+ matching records are never rendered — only the current page is put into the DOM.
+1. The **server** narrows the universe with the free-text `Text` parameter (search).
+2. The request carries **exactly the documented parameters** — nothing invented.
+3. The store loads that matching set and derives the visible page **in memory** (slice of `pageSize` per `page`). The UI renders at most `pageSize` rows (default 5) — 100,000+ matching records are never rendered, only the current page enters the DOM.
 4. A safety cap (`maxRecordsToLoad`, default 50,000) protects the browser from absurdly large responses and shows a warning banner with guidance to narrow the search.
 
-This is documented rather than faked because no true server-side pagination contract exists. See [Known API Limitations](#known-api-limitations).
+This is documented rather than faked because no true server-side pagination contract exists. The frontend is **ready for the day the backend implements it**: `buildCustomerQueryParams` (`CustomerService`) already codifies the full proposed paged request (`Page`, `PageSize`, `SortField`, `SortDirection`, `ClientTypeId`, `AccountManagerId`, `CityId`, `CountryId`) and the store switches to true server-side mode — rendering exactly the returned page and driving the paginator from the server `Total` — when `environment.customers.serverPagination` is set to `true` (default `false`). See [Known API Limitations](#known-api-limitations) and [Proposed Backend Contract](#proposed-backend-contract).
 
 ## Searching
 
@@ -187,10 +188,10 @@ user input → debounceTime(400ms) → distinctUntilChanged()
 
 The filter popover offers the reference fields: **ID, Code, Name, Email, Mobile** (free-text) and **Client Type, Account Manager, City, Country** (categorical).
 
-- Free-text filters are composed into the server-side `Text` parameter (e.g. `id:1024 name:acme`) — the server narrows the result.
-- Categorical filters are applied over the loaded matching set with memoized `computed()`s. This is a documented API limitation: the endpoint has no categorical filter parameters (see [Known API Limitations](#known-api-limitations)).
+- The search box term is composed into the server-side `Text` parameter — the server narrows the result.
+- Categorical and per-field text filters are applied over the loaded matching set with memoized `computed()`s. This is a documented API limitation: the endpoint has no categorical or per-field filter parameters (see [Known API Limitations](#known-api-limitations)). The request never invents filter parameters the API does not support.
 - Active filters appear as removable chips; "Clear all" resets everything. Both actions reset pagination to page 1.
-- Categorical dropdown options are derived from the real loaded data (distinct values), never hard-coded.
+- Categorical dropdown options are derived from the real loaded data (distinct values, seeded from the first load so they cover more than the current page), never hard-coded. The current API has no lookup endpoints; see [Proposed Backend Contract](#proposed-backend-contract).
 
 ## Sorting
 
@@ -198,6 +199,36 @@ The filter popover offers the reference fields: **ID, Code, Name, Email, Mobile*
 - Sorting is applied over the loaded matching set (the API has no sort parameter) with a stable tie-break (id) so paging stays consistent.
 - Sorting resets to page 1.
 - Only the current page is re-rendered; no client-side sorting of 100k+ rows is attempted when filtering has already narrowed the set — and it is intentionally not claimed to be server-side.
+
+## Proposed Backend Contract
+
+The minimum API change required to turn this into true server-side pagination. Parameter names follow the API's existing PascalCase convention:
+
+```text
+GET /api/CRM/ReadAllCRMClients
+    ?Text=                 # existing free-text search (unchanged)
+    &Direction=ltr         # existing (unchanged)
+    &InCT=                 # existing (unchanged)
+    &Page=1                # NEW — 1-based page number
+    &PageSize=50           # NEW — rows per page (default 50)
+    &SortField=AccountManagerName   # NEW — canonical DB/API field name
+    &SortDirection=asc     # NEW — asc | desc
+    &ClientTypeId=         # NEW — optional categorical filter id
+    &AccountManagerId=     # NEW — optional categorical filter id
+    &CityId=               # NEW — optional categorical filter id
+    &CountryId=            # NEW — optional categorical filter id
+
+Response (same shape as today):
+{ "Data": [ only the requested page ], "Total": 12345 }   # Total = matching count
+```
+
+Rules the frontend relies on:
+
+- `SortField` must accept canonical field names (`AccountManagerName`, `AccountTypeName`, `CommercialName`, `CityName`, `CountryName`, `Mobile`, `Code`, `Id`, …) — the frontend maps every grid column to one of these names in `SORT_FIELD_MAP` (`CustomerService`).
+- `Data` contains only the requested page; `Total` is the count of the matching set (filtered by `Text` + categorical ids + sort applied).
+- New dedicated lookup endpoints for **Client Types**, **Account Managers**, **Cities** and **Countries** are required so dropdown options are not derived from the current page. The store's `lookupRecords` signal is the single place to feed them.
+
+Enabling it in the frontend is a one-line config change: `environment.customers.serverPagination = true`.
 
 ## Signals
 
@@ -321,15 +352,16 @@ AI tools were used during development for UI ideation, architectural review, cod
 
 ## Known API Limitations
 
-These are **facts about the provided staging API**, not implementation shortcuts:
+These are **facts about the provided staging API** (verified against the Postman collection), not implementation shortcuts:
 
-1. **No true server-side pagination** — `ReadAllCRMClients` returns the full matching collection; it has no page/pageSize/take parameters and no pagination metadata. Client-side pagination over the server-filtered set is therefore the only correct implementation.
+1. **No true server-side pagination** — `ReadAllCRMClients` documents only `Text`, `Direction`, `InCT`; it returns the full matching collection as `{ Data, Total }` with no page/pageSize/take parameters and no pagination metadata. Client-side pagination over the server-narrowed set is therefore the only correct implementation — the request never sends invented pagination parameters. The frontend is ready for the proposed paged contract via `environment.customers.serverPagination` (see [Proposed Backend Contract](#proposed-backend-contract)).
 2. **No server-side sorting** — sorting is applied over the loaded matching set.
-3. **No categorical filter parameters** — Client Type / Account Manager / City / Country filters run over the loaded matching set. Free-text filters _are_ served server-side via `Text`.
+3. **No categorical or per-field filter parameters** — Client Type / Account Manager / City / Country filters run over the loaded matching set. Only the search-box `Text` is served server-side.
 4. **No edit-specific endpoint** — the assessment provides only Read + Save; `SaveCustomerWithContactPerson` is contractually a save (create/update) call, so Edit reuses the same form and the same endpoint, preserving the customer `Id` in the payload. No fake update endpoint is invented.
 5. **No delete endpoint** — Delete shows an explicit confirmation that the action is unavailable in this assessment rather than simulating success.
 6. **No export endpoint** — Excel export covers the loaded matching set (see [Excel Export](#excel-export)).
-7. **No auth endpoint** — the Authorization header must be supplied via the local runtime config.
+7. **No lookup endpoints** — dropdown options are derived from the loaded matching set (seeded from the first load). Dedicated lookup endpoints are part of the proposed backend contract.
+8. **No auth endpoint** — the Authorization header must be supplied via the local runtime config.
 
 ## Architectural Decisions
 

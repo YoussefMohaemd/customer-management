@@ -3,12 +3,20 @@
   [loading]="store.loading()"
   [scrollable]="true"
   dataKey="id"
+  selectionMode="multiple"
+  [selection]="store.selectedOnPage()"
+  (selectionChange)="store.syncSelection($event)"
   styleClass="p-datatable-sm customer-datatable"
   [tableStyle]="{ 'min-width': '960px' }"
   [rowHover]="true"
 >
   <ng-template pTemplate="header">
     <tr>
+      @if (store.selectionEnabled()) {
+        <th style="width: 3rem" class="center">
+          <p-tableHeaderCheckbox />
+        </th>
+      }
       @for (column of store.selectedColumnDefs(); track column.field) {
         <th [class]="column.align ?? 'left'" [style.width]="column.width">{{ column.label }}</th>
       }
@@ -18,6 +26,11 @@
 
   <ng-template pTemplate="body" let-customer let-rowIndex="rowIndex">
     <tr [attr.aria-rowindex]="rowIndex + 1">
+      @if (store.selectionEnabled()) {
+        <td class="center">
+          <p-tableCheckbox [value]="customer" />
+        </td>
+      }
       @for (column of store.selectedColumnDefs(); track column.field) {
         <td [class]="column.align ?? 'left'">
           @switch (column.type) {
@@ -130,7 +143,7 @@
     </tr>
   </ng-template>
 
-  <ng-template pTemplate="emptydata">
+  <ng-template pTemplate="empty">
     <tr>
       <td [attr.colspan]="colspan()" class="!p-0">
         <app-empty-state
@@ -143,13 +156,26 @@
   </ng-template>
 
   <ng-template pTemplate="loadingbody">
-    <tr>
-      <td [attr.colspan]="colspan()">
-        <div class="flex items-center justify-center gap-2 py-10 text-sm text-slate-400">
-          <i class="pi pi-spin pi-spinner text-base" aria-hidden="true"></i>
-          Loading customers…
-        </div>
-      </td>
-    </tr>
+    @for (row of skeletonRows(); track row) {
+      <tr class="skeleton-row" aria-hidden="true">
+        @if (store.selectionEnabled()) {
+          <td class="center">
+            <span class="sk sk-check"></span>
+          </td>
+        }
+        @for (column of store.selectedColumnDefs(); track column.field; let columnIndex = $index) {
+          <td [class]="column.align ?? 'left'">
+            <span
+              class="sk"
+              [class.sk-short]="(row + columnIndex) % 3 === 0"
+              [class.sk-medium]="(row + columnIndex) % 3 === 1"
+            ></span>
+          </td>
+        }
+        <td class="center">
+          <span class="sk sk-icon"></span>
+        </td>
+      </tr>
+    }
   </ng-template>
 </p-table>

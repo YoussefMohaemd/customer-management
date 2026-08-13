@@ -1,33 +1,33 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  OnDestroy,
+  OnInit,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { debounceTime, Subject } from 'rxjs';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
-import { PopoverModule } from 'primeng/popover';
 import { SelectModule } from 'primeng/select';
-import { PrimeTemplate } from 'primeng/api';
 
+import { environment } from '@environments/environment';
 import {
-  CATEGORICAL_OPERATORS,
   CustomerFilterKey,
-  CustomerFilterOperator,
   CustomerTextFilterKey,
-  DEFAULT_NUMERIC_OPERATOR,
-  DEFAULT_TEXT_OPERATOR,
-  NUMERIC_OPERATORS,
-  TEXT_OPERATORS,
-  customerOperatorLabel,
+  TEXT_FILTER_KEYS,
+  isTextFilterKey,
 } from '@features/customers/models/customer-query.model';
 import { CustomerStore } from '@features/customers/state/customer.store';
 
-interface FilterFieldOption {
-  key: string;
-  label: string;
-}
-
-interface FilterOperatorOption {
-  value: CustomerFilterOperator;
-  label: string;
-}
+type TextFilterField = { key: CustomerTextFilterKey; label: string; kind: 'text' | 'numeric' };
+type CategoricalFilterField = { key: CustomerFilterKey; label: string; kind: 'categorical' };
+type FilterField = TextFilterField | CategoricalFilterField;
 
 interface CategoricalValueOption {
   value: number | null;
@@ -35,68 +35,113 @@ interface CategoricalValueOption {
 }
 
 /**
- * Filter button + panel (self-contained).
+ * Filter panel (rendered by the toolbar as a block directly underneath the
+ * toolbar row — never inside it).
  *
- * The panel is driven by the currently selected table columns: only fields
- * that are both visible in the table and filterable are offered. The user
- * explicitly picks the field, the operator and the value, then presses
- * Apply. Table headers never trigger filtering.
+ * The panel is fully derived from the existing Columns dropdown: one filter
+ * input is generated for every column currently selected there, so the user
+ * never picks the fields again. Changing the column selection immediately
+ * re-renders the panel (adds/removes inputs) and any filter value that loses
+ * its column is pruned.
  *
- * Free-text filters are composed into the server-side `Text` parameter of
- * the Read API and refined client-side by the chosen operator (the staging
- * API exposes no operator parameter). Categorical filters apply over the
- * loaded result set — see README.
+ * The toolbar creates/destroys this component to open/close the panel, so the
+ * open/close bookkeeping is lifecycle-based: drafts are restored from the
+ * store on creation and flushed back on destruction.
+ *
+ * Free-text filters are drafted locally and flushed to the store debounced
+ * while typing; both free-text and categorical filters are applied over the
+ * loaded result set (the staging API exposes no per-field filter parameters)
+ * — see README.
  */
 @Component({
   selector: 'app-customer-filters',
-  imports: [FormsModule, ButtonModule, InputTextModule, PopoverModule, SelectModule, PrimeTemplate],
+  imports: [FormsModule, ButtonModule, InputTextModule, SelectModule],
   templateUrl: './customer-filters.component.html',
   styleUrl: './customer-filters.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class CustomerFiltersComponent {
+export class CustomerFiltersComponent implements OnInit, OnDestroy {
   protected readonly store = inject(CustomerStore);
+  private readonly destroyRef = inject(DestroyRef);
 
-  protected popoverOpen = false;
-
-  /** Fields = currently visible table columns that support filtering. */
-  protected readonly filterOptions = computed<FilterFieldOption[]>(() =>
-    this.store
-      .filterableColumnDefs()
-      .map((column) => ({ key: column.filter!.key, label: column.label })),
+  /** One filter field per column currently selected in the Columns dropdown. */
+  protected readonly filterFields = computed<FilterField[]>(() =>
+    this.store.filterableColumnDefs().map((column) => {
+      const filter = column.filter!;
+      if (filter.kind === 'categorical') {
+        return {
+          key: filter.key as CustomerFilterKey,
+          label: column.label,
+          kind: 'categorical' as const,
+        };
+      }
+      return {
+        key: filter.key as CustomerTextFilterKey,
+        label: column.label,
+        kind: filter.kind,
+      };
+    }),
   );
 
-  protected readonly selectedFieldDef = computed<{
-    key: string;
-    kind: 'text' | 'numeric' | 'categorical';
-  } | null>(() => {
-    const options = this.filterOptions();
-    const selected = options.find((option) => option.key === this.selectedField);
-    if (!selected) {
-      return null;
-    }
-    const def = this.store
-      .filterableColumnDefs()
-      .find((column) => column.filter!.key === selected.key);
-    return def ? { key: selected.key, kind: def.filter!.kind } : null;
-  });
+  /** Local free-text drafts; flushed to the store debounced while typing. */
+  protected readonly textDrafts = signal<Partial<Record<CustomerTextFilterKey, string>>>({});
 
-  protected readonly operatorOptions = computed<FilterOperatorOption[]>(() => {
-    const kind = this.selectedFieldDef()?.kind;
-    const operators =
-      kind === 'numeric'
-        ? NUMERIC_OPERATORS
-        : kind === 'categorical'
-          ? CATEGORICAL_OPERATORS
-          : TEXT_OPERATORS;
-    return operators.map((operator) => ({
-      value: operator,
-      label: customerOperatorLabel(operator),
-    }));
-  });
+  /** True while the store or the pending drafts hold any filter value. */
+  protected readonly hasFilterValues = computed(
+    () =>
+      this.store.totalFilterCount() > 0 ||
+      Object.values(this.textDrafts()).some((value) => (value ?? '').trim().length > 0),
+  );
 
-  protected readonly categoricalValueOptions = computed<CategoricalValueOption[]>(() => {
-    switch (this.selectedField) {
+  private readonly flush$ = new Subject<void>();
+
+  constructor() {
+    this.flush$
+      .pipe(
+        debounceTime(environment.customers.searchDebounceMs),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(() => this.flushTextDrafts());
+
+    // Drop drafts for columns deselected in the Columns dropdown so no ghost
+    // value is flushed back when the panel closes.
+    effect(() => {
+      const visibleKeys = new Set(this.filterFields().map((field) => field.key));
+      this.textDrafts.update((drafts) => {
+        if (Object.keys(drafts).every((key) => visibleKeys.has(key as CustomerTextFilterKey))) {
+          return drafts;
+        }
+        const next: Partial<Record<CustomerTextFilterKey, string>> = {};
+        for (const key of TEXT_FILTER_KEYS) {
+          if (visibleKeys.has(key)) {
+            next[key] = drafts[key];
+          }
+        }
+        return next;
+      });
+    });
+  }
+
+  /** Opening the panel: restore the committed store values as local drafts. */
+  ngOnInit(): void {
+    this.syncDraftsFromStore();
+  }
+
+  /** Closing the panel: push the pending drafts into the store. */
+  ngOnDestroy(): void {
+    this.flushTextDrafts();
+  }
+
+  protected textValueFor(key: CustomerTextFilterKey): string {
+    return this.textDrafts()[key] ?? '';
+  }
+
+  protected categoricalValueFor(key: CustomerFilterKey): number | null {
+    return this.store.filters()[key] ?? null;
+  }
+
+  protected categoricalOptionsFor(key: CustomerFilterKey): CategoricalValueOption[] {
+    switch (key) {
       case 'clientTypeId':
         return this.store.clientTypeOptions();
       case 'accountManagerId':
@@ -108,170 +153,43 @@ export class CustomerFiltersComponent {
       default:
         return [];
     }
-  });
-
-  protected readonly canApply = computed(() => {
-    const def = this.selectedFieldDef();
-    if (!def || !this.selectedOperator) {
-      return false;
-    }
-    if (def.kind === 'categorical') {
-      return this.selectedCategoricalValue !== null && this.selectedCategoricalValue !== undefined;
-    }
-    return this.selectedTextValue.trim().length > 0;
-  });
-
-  protected selectedField: string | null = null;
-  protected selectedOperator: CustomerFilterOperator | null = null;
-  protected selectedTextValue = '';
-  protected selectedCategoricalValue: number | null = null;
-
-  /** Local editable copies bound to the panel inputs. */
-  protected readonly values: Partial<Record<CustomerTextFilterKey, string>> &
-    Partial<Record<CustomerFilterKey, number>> = {};
-
-  protected onPanelOpen(): void {
-    this.popoverOpen = true;
-    this.syncValuesFromStore();
-    this.syncSelectionFromStore();
   }
 
-  protected onPanelClose(): void {
-    this.popoverOpen = false;
+  protected onTextInput(key: CustomerTextFilterKey, event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.textDrafts.update((drafts) => ({
+      ...drafts,
+      [key]: value,
+    }));
   }
 
-  protected onFieldChange(field: string | null | undefined): void {
-    this.selectedField = field ?? null;
-    const def = this.selectedFieldDef();
-    this.selectedOperator = def
-      ? def.kind === 'numeric'
-        ? DEFAULT_NUMERIC_OPERATOR
-        : DEFAULT_TEXT_OPERATOR
-      : null;
-    this.selectedTextValue = '';
-    this.selectedCategoricalValue = null;
-    if (field && this.store.textFilters()[field as CustomerTextFilterKey] !== undefined) {
-      this.selectedTextValue = this.store.textFilters()[field as CustomerTextFilterKey] ?? '';
-      this.selectedOperator =
-        this.store.textFilterOperators()[field as CustomerTextFilterKey] ?? this.selectedOperator;
-    }
-  }
-
-  protected onOperatorChange(operator: CustomerFilterOperator | null | undefined): void {
-    this.selectedOperator = operator ?? null;
-  }
-
-  /** Sends the selected field/operator/value row to the store. */
-  protected apply(): void {
-    if (!this.canApply()) {
-      return;
-    }
-    const def = this.selectedFieldDef();
-    if (!def) {
-      return;
-    }
-    if (def.kind === 'categorical') {
-      this.onCategoricalFilterChange(def.key as CustomerFilterKey, this.selectedCategoricalValue);
-      return;
-    }
-    if (!this.selectedOperator) {
-      return;
-    }
-    this.store.applyTextFilter(
-      def.key as CustomerTextFilterKey,
-      this.selectedOperator,
-      this.selectedTextValue.trim(),
-    );
-  }
-
-  /** Clears the currently selected field's filter only. */
-  protected clearCurrent(): void {
-    const def = this.selectedFieldDef();
-    if (!def) {
-      return;
-    }
-    if (def.kind === 'categorical') {
-      this.onCategoricalFilterChange(def.key as CustomerFilterKey, null);
-      this.selectedCategoricalValue = null;
-    } else {
-      this.store.setTextFilter(def.key as CustomerTextFilterKey, '');
-      this.selectedTextValue = '';
-    }
+  protected onCategoricalChange(key: CustomerFilterKey, value: number | null | undefined): void {
+    this.store.setCategoricalFilter(key, value ?? null);
   }
 
   protected clearAll(): void {
     this.store.clearAllFilters();
-    this.syncValuesFromStore();
-    this.selectedTextValue = '';
-    this.selectedCategoricalValue = null;
+    this.textDrafts.set({});
   }
 
-  protected onTextFilterChange(
-    key: CustomerTextFilterKey,
-    value: string | number | null | undefined,
-  ): void {
-    this.store.setTextFilter(key, value === null || value === undefined ? '' : String(value));
-  }
-
-  protected onCategoricalFilterChange(
-    key: CustomerFilterKey,
-    value: number | null | undefined,
-  ): void {
-    this.store.setCategoricalFilter(key, value ?? null);
-  }
-
-  /** Reflects the store state into the local input copies on every open. */
-  private syncValuesFromStore(): void {
-    const textFilters = this.store.textFilters();
-    const filters = this.store.filters();
-    this.values.id = textFilters.id ?? '';
-    this.values.code = textFilters.code ?? '';
-    this.values.name = textFilters.name ?? '';
-    this.values.email = textFilters.email ?? '';
-    this.values.mobile = textFilters.mobile ?? '';
-    this.values.clientTypeId = filters.clientTypeId ?? undefined;
-    this.values.accountManagerId = filters.accountManagerId ?? undefined;
-    this.values.cityId = filters.cityId ?? undefined;
-    this.values.countryId = filters.countryId ?? undefined;
-  }
-
-  /**
-   * Restores the field/operator/value row from the store when the panel
-   * re-opens, dropping selections that no longer match the visible columns.
-   */
-  private syncSelectionFromStore(): void {
-    if (this.selectedField && !this.filterOptions().some((o) => o.key === this.selectedField)) {
-      this.selectedField = null;
+  /** Pushes only the drafts that differ from the committed store values. */
+  protected flushTextDrafts(): void {
+    const drafts = this.textDrafts();
+    const committed = this.store.textFilters();
+    for (const key of TEXT_FILTER_KEYS) {
+      const draft = (drafts[key] ?? '').trim();
+      if (draft !== (committed[key] ?? '').trim()) {
+        this.store.setTextFilter(key, draft);
+      }
     }
-    if (!this.selectedField) {
-      const active = TEXT_FILTER_KEYS.find((key) => (this.store.textFilters()[key] ?? '').trim());
-      const categorical = CATEGORICAL_KEYS.find((key) => this.store.filters()[key] !== null);
-      this.selectedField = active ?? categorical ?? null;
-      this.selectedTextValue = active ? (this.store.textFilters()[active] ?? '') : '';
-      this.selectedCategoricalValue = categorical ? this.store.filters()[categorical] : null;
-      const kind = this.selectedFieldDef()?.kind;
-      this.selectedOperator = active
-        ? (this.store.textFilterOperators()[active] ??
-          (kind === 'numeric' ? DEFAULT_NUMERIC_OPERATOR : DEFAULT_TEXT_OPERATOR))
-        : kind
-          ? kind === 'numeric'
-            ? DEFAULT_NUMERIC_OPERATOR
-            : DEFAULT_TEXT_OPERATOR
-          : null;
+  }
+
+  /** Restores the committed store values into the local drafts on open. */
+  private syncDraftsFromStore(): void {
+    const drafts: Partial<Record<CustomerTextFilterKey, string>> = {};
+    for (const key of TEXT_FILTER_KEYS) {
+      drafts[key] = this.store.textFilters()[key] ?? '';
     }
+    this.textDrafts.set(drafts);
   }
 }
-
-const TEXT_FILTER_KEYS: readonly CustomerTextFilterKey[] = [
-  'id',
-  'code',
-  'name',
-  'email',
-  'mobile',
-];
-const CATEGORICAL_KEYS: readonly CustomerFilterKey[] = [
-  'clientTypeId',
-  'accountManagerId',
-  'cityId',
-  'countryId',
-];

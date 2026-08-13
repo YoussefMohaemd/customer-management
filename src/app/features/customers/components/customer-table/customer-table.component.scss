@@ -63,3 +63,46 @@
   color: #475569;
   white-space: nowrap;
 }
+
+/* Single loading state: shimmer skeleton rows that keep the grid layout. */
+.skeleton-row {
+  .sk {
+    display: block;
+    width: 90%;
+    height: 14px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #edf1f6 25%, #dfe7f0 37%, #edf1f6 63%);
+    background-size: 400% 100%;
+    animation: sk-shimmer 1.3s ease-in-out infinite;
+
+    &.sk-short {
+      width: 55%;
+    }
+
+    &.sk-medium {
+      width: 75%;
+    }
+
+    &.sk-check {
+      width: 14px;
+      height: 14px;
+      margin: 0 auto;
+      border-radius: 3px;
+    }
+
+    &.sk-icon {
+      width: 18px;
+      height: 14px;
+      margin: 0 auto;
+    }
+  }
+}
+
+@keyframes sk-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}

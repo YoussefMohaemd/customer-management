@@ -7,13 +7,6 @@
   gap: 1rem;
   padding: 1.5rem 1rem;
 
-  box-shadow:
-    0 1px 3px rgba(15, 23, 42, 0.08),
-    0 4px 12px rgba(15, 23, 42, 0.06);
-
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  border-radius: 6px;
-
   @media (min-width: 640px) {
     padding-inline: 1.5rem;
   }
@@ -70,14 +63,48 @@
   }
 }
 
-.table-card {
-  overflow: hidden;
+/**
+ * Independent elevated card used by every major section (Custom, Actions,
+ * Reports) so the page no longer reads as one large container.
+ */
+.section-card {
   border: 1px solid #dce3ec;
   border-radius: 8px;
   background-color: #fff;
   box-shadow:
     0 1px 2px rgb(15 23 42 / 0.05),
     0 6px 18px rgb(15 23 42 / 0.06);
+  padding: 1rem 1.25rem;
+
+  &.section-card--no-pad {
+    padding: 0;
+  }
+}
+
+/* Custom section: the whole area (heading, search/filter toolbar, actions
+   and the table) lives inside one card — the single shadow comes from
+   `.section-card`. Only the table spans edge-to-edge below the head. */
+.custom-card {
+  overflow: hidden;
+  padding: 0;
+}
+
+.custom-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 16px 14px;
+
+  .section-heading {
+    margin: 0;
+  }
+}
+
+.custom-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
 }
 
 :host {
@@ -240,17 +267,9 @@
     color: #2c7fff;
   }
 
-  &.spinning .pi {
-    animation: pg-refresh-spin 800ms linear infinite;
-  }
-}
-
-@keyframes pg-refresh-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
+  &:disabled {
+    color: #c2ccd9;
+    cursor: not-allowed;
   }
 }
 

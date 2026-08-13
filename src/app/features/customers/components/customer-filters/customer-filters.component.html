@@ -1,128 +1,57 @@
-<button
-  #filterButton
-  type="button"
-  (click)="panel.toggle($event)"
-  class="filter-button"
-  [attr.aria-haspopup]="'dialog'"
-  [attr.aria-expanded]="popoverOpen"
-  aria-label="Toggle filters"
->
-  <i class="pi pi-filter text-[13px]" aria-hidden="true"></i>
-  <span class="hidden sm:inline">Filter</span>
-  @if (store.totalFilterCount() > 0) {
-    <span class="filter-count" aria-label="{{ store.totalFilterCount() }} active filters">
-      {{ store.totalFilterCount() }}
-    </span>
-  }
-  <i class="pi pi-angle-down text-[10px] text-slate-400" aria-hidden="true"></i>
-</button>
+<div class="filter-panel" role="region" aria-label="Filters for the selected columns">
+  <div class="filter-panel-head">
+    <span class="filter-panel-title">Filters</span>
+  </div>
 
-<p-popover
-  #panel
-  [dismissable]="true"
-  appendTo="body"
-  (onShow)="onPanelOpen()"
-  (onHide)="onPanelClose()"
->
-  <ng-template pTemplate="content">
-    <div class="filter-panel">
-      <div class="filter-panel-head">
-        <span class="filter-panel-title">Filter by</span>
-        @if (store.totalFilterCount() > 0) {
-          <button
-            type="button"
-            class="clear-all-btn"
-            (click)="clearAll()"
-            aria-label="Clear all filters"
-          >
-            Clear all
-          </button>
-        }
-      </div>
-
-      @if (filterOptions().length === 0) {
-        <p class="fp-empty">
-          No filterable columns are selected. Open the <strong>Columns</strong> menu and select at
-          least one column that supports filtering.
-        </p>
-      } @else {
-        <div class="fp-grid">
-          <label class="fp-field">
-            <span>Field</span>
+  @if (filterFields().length === 0) {
+    <p class="fp-empty">
+      No filterable columns are selected. Open the <strong>Columns</strong> menu and select at
+      least one column that supports filtering.
+    </p>
+  } @else {
+    <!-- One input per column selected in the existing Columns dropdown -->
+    <div class="fp-grid">
+      @for (field of filterFields(); track field.key) {
+        <label class="fp-field">
+          <span class="fp-label">{{ field.label }}</span>
+          @if (field.kind === 'categorical') {
             <p-select
-              [options]="filterOptions()"
-              optionLabel="label"
-              optionValue="key"
-              [(ngModel)]="selectedField"
-              (ngModelChange)="onFieldChange($event)"
-              placeholder="Choose field"
-              [showClear]="true"
-              class="w-full"
-            />
-          </label>
-
-          <label class="fp-field">
-            <span>Operator</span>
-            <p-select
-              [options]="operatorOptions()"
+              [options]="categoricalOptionsFor(field.key)"
               optionLabel="label"
               optionValue="value"
-              [ngModel]="selectedOperator"
-              (ngModelChange)="onOperatorChange($event)"
-              placeholder="Operator"
+              [ngModel]="categoricalValueFor(field.key)"
+              (ngModelChange)="onCategoricalChange(field.key, $event)"
               [showClear]="true"
+              placeholder="Filter"
+              [attr.aria-label]="'Filter by ' + field.label"
               class="w-full"
             />
-          </label>
-
-          <label class="fp-field">
-            <span>Value</span>
-            @if (selectedFieldDef()?.kind === 'categorical') {
-              <p-select
-                [options]="categoricalValueOptions()"
-                optionLabel="label"
-                optionValue="value"
-                [(ngModel)]="selectedCategoricalValue"
-                placeholder="Value"
-                [showClear]="true"
-                class="w-full"
-              />
-            } @else {
-              <input
-                pInputText
-                type="text"
-                [(ngModel)]="selectedTextValue"
-                [placeholder]="
-                  selectedFieldDef()?.kind === 'numeric' ? 'Enter a number' : 'Filter value'
-                "
-                class="w-full"
-              />
-            }
-          </label>
-        </div>
-
-        <div class="fp-actions">
-          <button
-            type="button"
-            class="fp-apply"
-            (click)="apply()"
-            [disabled]="!canApply()"
-            aria-label="Apply filter"
-          >
-            <i class="pi pi-check text-[11px]" aria-hidden="true"></i>
-            Apply
-          </button>
-          <button
-            type="button"
-            class="fp-clear"
-            (click)="clearCurrent()"
-            [disabled]="!selectedFieldDef() && store.totalFilterCount() === 0"
-            aria-label="Clear current filter"
-          >
-            Clear
-          </button>
-        </div>
+          } @else {
+            <input
+              pInputText
+              type="text"
+              class="fp-text-input w-full"
+              [value]="textValueFor(field.key)"
+              (input)="onTextInput(field.key, $event)"
+              [placeholder]="'Filter ' + field.label"
+              [attr.aria-label]="'Filter by ' + field.label"
+            />
+          }
+        </label>
       }
     </div>
-  </ng-template>
-</p-popover>
+  }
+
+  <div class="fp-footer">
+    <button
+      type="button"
+      class="clear-all-btn"
+      (click)="clearAll()"
+      [disabled]="!hasFilterValues()"
+      aria-label="Clear all filters"
+    >
+      <i class="pi pi-filter-slash text-[11px]" aria-hidden="true"></i>
+      Clear All Filters
+    </button>
+  </div>
+</div>

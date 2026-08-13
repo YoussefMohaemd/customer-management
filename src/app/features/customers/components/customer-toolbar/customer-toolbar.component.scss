@@ -26,3 +26,108 @@
 .pi-microphone {
   font-size: 18px !important;
 }
+
+.filter-button {
+  display: inline-flex;
+  height: 45px;
+  align-items: center;
+  gap: 7px;
+  border-radius: 6px;
+  border: 1px solid #dfe5ee;
+  background-color: #fff;
+  padding-inline: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  color: #3f4a5c;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+
+  &:hover {
+    border-color: #c3cede;
+    background-color: #f6f9fd;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgb(43 99 224 / 0.5);
+  }
+
+  &.open {
+    border-color: #2c7fff;
+    background-color: #eaf3ff;
+    color: #175cd3;
+  }
+}
+
+.filter-count {
+  display: inline-flex;
+  min-width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background-color: #2c7fff;
+  padding-inline: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* Selected-filter chips sitting next to the Filter button. */
+.filter-chip {
+  display: inline-flex;
+  height: 22px;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #c3d8f8;
+  border-radius: 999px;
+  background-color: #eaf3ff;
+  padding-left: 10px;
+  padding-right: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #175cd3;
+
+  .filter-chip-label {
+    white-space: nowrap;
+  }
+
+  .filter-chip-value {
+    max-width: 160px;
+    overflow: hidden;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #3d6fd8;
+  }
+
+  .filter-chip-remove {
+    display: inline-flex;
+    width: 16px;
+    height: 16px;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background-color: transparent;
+    color: #5a8fe8;
+    cursor: pointer;
+    transition:
+      background-color 120ms ease,
+      color 120ms ease;
+
+    &:hover {
+      background-color: #d6e6ff;
+      color: #175cd3;
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px rgb(43 99 224 / 0.45);
+    }
+  }
+}
