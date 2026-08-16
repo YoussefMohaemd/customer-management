@@ -44,6 +44,5 @@ __screenshots__/
 Thumbs.db
 
 # Secrets — never commit credentials
-/public/config/app-config.json
 .env
 .env.*
