@@ -1,6 +1,7 @@
 <p-table
   [value]="store.paginatedCustomers()"
   [loading]="store.loading()"
+  [showLoader]="false"
   [scrollable]="true"
   dataKey="id"
   selectionMode="multiple"

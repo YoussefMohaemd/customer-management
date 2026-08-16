@@ -1,35 +1,25 @@
 export interface Environment {
   production: boolean;
   api: {
-    baseUrl: string;
-    crmPath: string;
-    endpoints: {
-      readAllCrmClients: string;
-      saveCustomerWithContactPerson: string;
+    /**
+     * Base URL of the Backend-for-Frontend (BFF). Empty string = same origin:
+     * the Angular dev-server proxy routes `/api/customers` to the BFF (see
+     * `proxy.conf.json`). In production, set this to the deployed BFF origin
+     * when the app and the BFF are hosted separately.
+     */
+    bffBaseUrl: string;
+    /** BFF routes (see `server/src/server.js`). */
+    bff: {
+      customers: string;
+      saveCustomer: string;
+      exportCustomers: string;
+      lookups: string;
+      health: string;
     };
-    direction: string;
   };
   customers: {
     defaultPageSize: number;
     pageSizeOptions: number[];
     searchDebounceMs: number;
-    maxRecordsToLoad: number;
-    /**
-     * How long the in-memory cache of a legacy-API search result stays
-     * fresh (milliseconds). While fresh, pagination/sorting/filtering and
-     * re-visits of the page are served instantly from the cache. The
-     * Refresh button and successful Saves always bust the cache.
-     */
-    cacheTtlMs: number;
-    /**
-     * Whether the Read API supports true server-side pagination, sorting and
-     * categorical filtering. The current staging API does NOT (verified from
-     * the Postman collection: only `Text`, `Direction`, `InCT`), so this
-     * stays `false` and the store derives the page over the loaded set.
-     * Set to `true` once the backend implements the proposed contract in
-     * the README — the service then sends the full paged query and the
-     * store renders exactly the returned page with the server `Total`.
-     */
-    serverPagination: boolean;
   };
 }

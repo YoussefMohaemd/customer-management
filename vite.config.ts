@@ -1,9 +1,9 @@
 import { defineConfig } from 'vitest/config';
 import { fileURLToPath, URL } from 'node:url';
-import { ng } from '@analogjs/vite-plugin-angular';
+import angular from '@analogjs/vite-plugin-angular';
 
 export default defineConfig({
-  plugins: [ng()],
+  plugins: [angular()],
   resolve: {
     alias: {
       '@app': fileURLToPath(new URL('./src/app', import.meta.url)),

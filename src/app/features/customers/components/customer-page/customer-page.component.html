@@ -56,22 +56,16 @@
             type="button"
             class="export-button"
             (click)="exportExcel()"
-            [disabled]="store.sortedRecords().length === 0"
+            [disabled]="exporting() || store.loading() || store.isEmptyResult()"
           >
-            <i class="pi pi-file-excel" aria-hidden="true"></i>
-            Export Excel
+            @if (exporting()) {
+              <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+            } @else {
+              <i class="pi pi-file-excel" aria-hidden="true"></i>
+            }
+            {{ exporting() ? 'Exporting…' : 'Export Excel' }}
           </button>
         </div>
-
-        @if (store.loadWarning()) {
-          <div
-            class="flex items-start gap-2.5 rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-800"
-            role="status"
-          >
-            <i class="pi pi-exclamation-triangle mt-0.5" aria-hidden="true"></i>
-            <div>{{ store.loadWarning() }}</div>
-          </div>
-        }
 
         @if (store.activeAction(); as action) {
           <div

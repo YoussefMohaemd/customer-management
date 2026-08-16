@@ -3,20 +3,20 @@ import type { Environment } from './environment.types';
 export const environment: Environment = {
   production: true,
   api: {
-    baseUrl: 'https://testmobapi.erppluscloud.com',
-    crmPath: '/api/CRM',
-    endpoints: {
-      readAllCrmClients: '/api/CRM/ReadAllCRMClients',
-      saveCustomerWithContactPerson: '/api/CRM/SaveCustomerWithContactPerson',
+    // Same-origin by default: deploy the BFF behind the same host/domain as
+    // the app and set bffBaseUrl to its origin if hosted separately.
+    bffBaseUrl: '',
+    bff: {
+      customers: '/api/customers',
+      saveCustomer: '/api/customers/save',
+      exportCustomers: '/api/customers/export',
+      lookups: '/api/customers/lookups',
+      health: '/api/health',
     },
-    direction: 'ltr',
   },
   customers: {
     defaultPageSize: 5,
-    pageSizeOptions: [5, 10, 20, 30],
+    pageSizeOptions: [5, 10, 20],
     searchDebounceMs: 400,
-    maxRecordsToLoad: 50000,
-    cacheTtlMs: 300_000,
-    serverPagination: false,
   },
 };

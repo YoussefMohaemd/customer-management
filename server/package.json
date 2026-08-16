@@ -1,0 +1,14 @@
+{
+  "name": "customer-management-bff",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Backend-for-Frontend (BFF) for the Customer Management module. The staging CRM API ignores every query parameter and always returns the full ~14,000-record dataset; this BFF caches that dataset server-side and serves true server-side pagination, search, filtering and sorting so the Angular app never downloads more than the current page.",
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  }
+}

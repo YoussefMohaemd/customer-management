@@ -5,7 +5,9 @@ import {
   OnInit,
   computed,
   inject,
+  signal,
 } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { TooltipModule } from 'primeng/tooltip';
@@ -58,6 +60,9 @@ export class CustomerPageComponent implements OnInit {
 
   protected readonly pageSizeOptions = environment.customers.pageSizeOptions;
 
+  /** True while the Excel export downloads the full matching set from the BFF. */
+  protected readonly exporting = signal(false);
+
   protected readonly totalLabel = computed(() => this.store.totalRecords().toLocaleString());
 
   /** Up to 5 page links, sliding around the current page. */
@@ -107,24 +112,42 @@ export class CustomerPageComponent implements OnInit {
     this.store.setPageSize(Number(size));
   }
 
-  protected exportExcel(): void {
-    const records = this.store.sortedRecords();
-    if (records.length === 0) {
-      this.messageService.add({
-        severity: 'warn',
-        summary: 'Nothing to export',
-        detail: 'There are no matching customers to export.',
-        life: 3000,
-      });
+  protected async exportExcel(): Promise<void> {
+    if (this.exporting()) {
       return;
     }
-    this.excelService.exportCustomers(records);
-    this.messageService.add({
-      severity: 'success',
-      summary: 'Export started',
-      detail: `${records.length.toLocaleString()} customers exported to Excel (current result set).`,
-      life: 4000,
-    });
+    this.exporting.set(true);
+    try {
+      // The BFF applies the current search + filters + sort and returns the
+      // full matching set (no pagination) so the export covers the entire
+      // result, never just the visible page.
+      const records = await firstValueFrom(this.store.exportAll());
+      if (records.length === 0) {
+        this.messageService.add({
+          severity: 'warn',
+          summary: 'Nothing to export',
+          detail: 'There are no matching customers to export.',
+          life: 3000,
+        });
+        return;
+      }
+      this.excelService.exportCustomers(records);
+      this.messageService.add({
+        severity: 'success',
+        summary: 'Export started',
+        detail: `${records.length.toLocaleString()} customers exported to Excel (current result set).`,
+        life: 4000,
+      });
+    } catch {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Export failed',
+        detail: 'The matching customers could not be fetched for export.',
+        life: 4000,
+      });
+    } finally {
+      this.exporting.set(false);
+    }
   }
 
   protected onDeleteRequested(customer: CustomerRecord): void {

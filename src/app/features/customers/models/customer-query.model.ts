@@ -241,6 +241,7 @@ export interface CustomerFilters {
 export interface CustomerQuery {
   search: string;
   textFilters: Partial<Record<CustomerTextFilterKey, string>>;
+  textFilterOperators: Partial<Record<CustomerTextFilterKey, CustomerFilterOperator>>;
   filters: CustomerFilters;
   page: number;
   pageSize: number;
@@ -255,34 +256,31 @@ export const EMPTY_CUSTOMER_FILTERS: CustomerFilters = {
   countryId: null,
 };
 
+/** One option of a categorical filter dropdown (BFF lookups endpoint). */
+export interface CustomerLookupOption {
+  value: number;
+  label: string;
+}
+
+/** Distinct filter dropdown options served by the BFF. */
+export interface CustomerLookups {
+  clientTypes: CustomerLookupOption[];
+  accountManagers: CustomerLookupOption[];
+  cities: CustomerLookupOption[];
+  countries: CustomerLookupOption[];
+}
+
 export function createEmptyCustomerQuery(): CustomerQuery {
   return {
     search: '',
     textFilters: {},
+    textFilterOperators: {},
     filters: { ...EMPTY_CUSTOMER_FILTERS },
     page: 1,
-    pageSize: 8,
+    pageSize: 5,
     sortField: null,
     sortDirection: 'asc',
   };
-}
-
-/**
- * Composes the `Text` parameter for the Read API.
- *
- * The staging backend exposes a single free-text search parameter that is
- * matched against the customer fields as a plain substring. Per-field text
- * filters are therefore NOT injected here: prefixing values like
- * `email:foo` or joining multiple terms makes the server search for that
- * literal string and returns zero rows (verified against the live API).
- * The search box term is the only server-side text narrowing; per-field
- * text filters are applied client-side over the returned set.
- */
-export function composeServerSearchText(
-  search: string,
-  _textFilters: Partial<Record<CustomerTextFilterKey, string>>,
-): string {
-  return search.trim();
 }
 
 export function isCustomerQueryEqual(a: CustomerQuery, b: CustomerQuery): boolean {
@@ -311,6 +309,12 @@ export function isCustomerQueryEqual(a: CustomerQuery, b: CustomerQuery): boolea
   for (const k of keys) {
     const key = k as CustomerTextFilterKey;
     if ((a.textFilters[key] ?? '').trim() !== (b.textFilters[key] ?? '').trim()) {
+      return false;
+    }
+    if (
+      (a.textFilterOperators[key] ?? '') !==
+      (b.textFilterOperators[key] ?? '')
+    ) {
       return false;
     }
   }

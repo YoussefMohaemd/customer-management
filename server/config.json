@@ -1,0 +1,20 @@
+{
+  "port": 3000,
+  "upstream": {
+    "baseUrl": "https://testmobapi.erppluscloud.com",
+    "readAllCrmClients": "/api/CRM/ReadAllCRMClients",
+    "saveCustomerWithContactPerson": "/api/CRM/SaveCustomerWithContactPerson",
+    "direction": "ltr",
+    "timeoutMs": 120000
+  },
+  "cache": {
+    "freshMs": 300000,
+    "maxStaleMs": 3600000
+  },
+  "token": {
+    "path": "../public/config/app-config.json"
+  },
+  "cors": {
+    "allowedOrigins": ["http://localhost:4200", "http://127.0.0.1:4200"]
+  }
+}

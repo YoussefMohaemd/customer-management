@@ -6,11 +6,14 @@ import { environment } from '@environments/environment';
 import {
   CustomerListResult,
   CustomerPayload,
+  CustomerRecord,
   normalizeCustomerList,
 } from '@features/customers/models/customer.model';
 import {
+  CustomerLookups,
   CustomerQuery,
   CustomerSortField,
+  CustomerTextFilterKey,
   SortDirection,
 } from '@features/customers/models/customer-query.model';
 import {
@@ -19,60 +22,70 @@ import {
 } from '@features/customers/models/customer-response.model';
 
 /**
- * Encapsulates every HTTP interaction with the CRM API.
+ * Encapsulates every HTTP interaction with the Customer BFF.
  *
- * Request contract (source of truth: the provided Postman collection):
- *  - `ReadAllCRMClients` is `GET .../ReadAllCRMClients?Text=&Direction=ltr&InCT=`.
- *    The collection documents exactly three query parameters — `Text`,
- *    `Direction`, `InCT`. There are NO pagination, sorting or categorical
- *    filter parameters, and the API returns the FULL matching collection as
- *    `{ "Data": Client[], "Total": number }` (verified live), where `Total`
- *    is the count of the full matching set.
- *  - Because the API has no pagination contract, the request carries only
- *    the documented parameters. The store renders the current page from the
- *    returned set (capped; see README → "Known API Limitations").
- *  - When `environment.customers.serverPagination` is enabled, the service
- *    additionally sends the proposed paged contract (`Page`, `PageSize`,
- *    `SortField`, `SortDirection`, `ClientTypeId`, `AccountManagerId`,
- *    `CityId`, `CountryId`) and the store switches to true server-side
- *    pagination with the server-provided `Total`. The flag is `false` until
- *    the backend implements that contract — see README → "Proposed Backend
- *    Contract".
- *  - `Text` receives only the search-box term (plain substring). Per-field
- *    text filters are applied client-side over the returned set.
- *  - `SaveCustomerWithContactPerson` is an upsert keyed by `Id` (0 = create).
+ * Architecture: Angular NEVER talks to the unparameterized CRM dump endpoint
+ * (`ReadAllCRMClients`) for table data. The CRM API ignores every query
+ * parameter — `Text`, `Direction`, `InCT`, `Page`, `PageSize`, `Skip`, `Take`,
+ * `offset`, `limit` (verified live: all return the byte-identical ~14,111-
+ * record / ~15 MB dump) — so the BFF (`server/`) fetches the dataset once,
+ * caches it server-side and serves real server-side pagination, search,
+ * filtering and sorting. See `server/README.md`.
+ *
+ * Request contract (BFF):
+ *   GET {bff}/customers?page=&pageSize=&search=&sortField=&sortDirection=
+ *       &clientTypeId=&accountManagerId=&cityId=&countryId=
+ *       &textFilters={json}&textOperators={json}
+ *   → { "data": Customer[], "totalCount": number }  (data = ONLY current page)
+ *
+ *   GET {bff}/customers/lookups   → { clientTypes, accountManagers, cities, countries }
+ *   GET {bff}/customers/export    → { data: [...all matching], totalCount }
+ *   POST {bff}/customers/save     → forwards SaveCustomerWithContactPerson
  */
 @Injectable({ providedIn: 'root' })
 export class CustomerService {
   private readonly http = inject(HttpClient);
 
-  private readonly readEndpoint = `${environment.api.baseUrl}${environment.api.endpoints.readAllCrmClients}`;
-  private readonly saveEndpoint = `${environment.api.baseUrl}${environment.api.endpoints.saveCustomerWithContactPerson}`;
+  private readonly customersEndpoint = `${environment.api.bffBaseUrl}${environment.api.bff.customers}`;
+  private readonly saveEndpoint = `${environment.api.bffBaseUrl}${environment.api.bff.saveCustomer}`;
+  private readonly exportEndpoint = `${environment.api.bffBaseUrl}${environment.api.bff.exportCustomers}`;
+  private readonly lookupsEndpoint = `${environment.api.bffBaseUrl}${environment.api.bff.lookups}`;
 
-  /** Reads the current matching customers from the CRM API. */
+  /** Reads ONLY the requested page of customers from the BFF. */
   fetchCustomers(query: CustomerQuery): Observable<CustomerListResult> {
     return this.http
-      .get(this.readEndpoint, { params: buildCustomerQueryParams(query) })
+      .get(this.customersEndpoint, { params: buildCustomerQueryParams(query) })
       .pipe(map(normalizeCustomerList));
   }
 
-  /** Creates (Id = 0) or updates (existing Id) a customer through
-   *  SaveCustomerWithContactPerson. */
-  saveCustomer(payload: CustomerPayload): Observable<SaveCustomerResult> {
-    const params = new HttpParams().set('InCT', '');
+  /** Fetches the full matching set (search + filters + sort, no pagination)
+   *  for Excel export. */
+  fetchCustomersForExport(query: CustomerQuery): Observable<CustomerRecord[]> {
     return this.http
-      .post(this.saveEndpoint, payload, { params })
+      .get(this.exportEndpoint, { params: buildCustomerQueryParams(query, false) })
+      .pipe(map((raw) => normalizeCustomerList(raw).records));
+  }
+
+  /** Distinct dropdown options for the categorical filters (BFF lookups). */
+  fetchLookups(): Observable<CustomerLookups> {
+    return this.http.get(this.lookupsEndpoint).pipe(map(normalizeCustomerLookups));
+  }
+
+  /** Creates (Id = 0) or updates (existing Id) a customer through the BFF,
+   *  which proxies `SaveCustomerWithContactPerson` and refreshes its cache. */
+  saveCustomer(payload: CustomerPayload): Observable<SaveCustomerResult> {
+    return this.http
+      .post(this.saveEndpoint, payload)
       .pipe(map(normalizeSaveCustomerResult));
   }
 }
 
 /**
  * Maps the canonical frontend sort field to the API/DB field name used by
- * the proposed server-side sort contract. Field names follow the API's own
- * payload conventions (`AccountManagerName`, `AccountTypeName`,
- * `CommercialName`, `CityName`, `CountryName`, …) so the backend never
- * receives invented frontend-only names such as `accountManager` or
- * `clientType`.
+ * the BFF's sort contract. Field names follow the API's own payload
+ * conventions (`AccountManagerName`, `AccountTypeName`, `CommercialName`,
+ * `CityName`, `CountryName`, …) so the backend never receives invented
+ * frontend-only names such as `accountManager` or `clientType`.
  */
 const SORT_FIELD_MAP: Record<CustomerSortField, string> = {
   id: 'Id',
@@ -108,52 +121,102 @@ const SORT_FIELD_MAP: Record<CustomerSortField, string> = {
 };
 
 /**
- * Builds the query string for `ReadAllCRMClients`.
+ * Builds the BFF query string for the customer table.
  *
- * Legacy mode (current API — the default): the request contains exactly the
- * three parameters documented in the Postman collection. No pagination,
- * sorting or categorical filter parameters are sent because the API does not
- * support them; inventing them would not change the server response.
- *
- * Server-pagination mode (`environment.customers.serverPagination = true`):
- * the same query object additionally carries the proposed paged contract —
- * `Page`/`PageSize` (offset derived as `(page - 1) * pageSize`),
- * `SortField`/`SortDirection` (canonical API field names) and the categorical
- * filter ids — and `{ "Data": [...], "Total": number }` is expected to carry
- * only the requested page with the total count of the matching set.
+ * The request carries the COMPLETE table state — page, pageSize, search,
+ * sort, categorical filter ids and per-field text filters/operators — so one
+ * real table-state change produces exactly one request and the BFF returns
+ * only the requested page.
  */
-export function buildCustomerQueryParams(query: CustomerQuery): HttpParams {
-  let params = new HttpParams()
-    .set('Text', query.search.trim())
-    .set('Direction', environment.api.direction)
-    .set('InCT', '');
+export function buildCustomerQueryParams(
+  query: CustomerQuery,
+  paginate = true,
+): HttpParams {
+  let params = new HttpParams();
 
-  if (environment.customers.serverPagination) {
-    params = params.set('Page', query.page.toString()).set('PageSize', query.pageSize.toString());
+  if (paginate) {
+    params = params.set('page', query.page.toString()).set('pageSize', query.pageSize.toString());
+  }
 
-    if (query.sortField) {
-      params = params
-        .set('SortField', SORT_FIELD_MAP[query.sortField])
-        .set('SortDirection', sortDirectionValue(query.sortDirection));
-    }
-    if (query.filters.clientTypeId !== null) {
-      params = params.set('ClientTypeId', query.filters.clientTypeId.toString());
-    }
-    if (query.filters.accountManagerId !== null) {
-      params = params.set('AccountManagerId', query.filters.accountManagerId.toString());
-    }
-    if (query.filters.cityId !== null) {
-      params = params.set('CityId', query.filters.cityId.toString());
-    }
-    if (query.filters.countryId !== null) {
-      params = params.set('CountryId', query.filters.countryId.toString());
-    }
+  const search = query.search.trim();
+  if (search) {
+    params = params.set('search', search);
+  }
+
+  if (query.sortField) {
+    params = params
+      .set('sortField', SORT_FIELD_MAP[query.sortField])
+      .set('sortDirection', query.sortDirection);
+  }
+
+  if (query.filters.clientTypeId !== null) {
+    params = params.set('clientTypeId', query.filters.clientTypeId.toString());
+  }
+  if (query.filters.accountManagerId !== null) {
+    params = params.set('accountManagerId', query.filters.accountManagerId.toString());
+  }
+  if (query.filters.cityId !== null) {
+    params = params.set('cityId', query.filters.cityId.toString());
+  }
+  if (query.filters.countryId !== null) {
+    params = params.set('countryId', query.filters.countryId.toString());
+  }
+
+  const activeTextFilters = collectActiveTextFilters(query);
+  if (Object.keys(activeTextFilters.filters).length > 0) {
+    params = params.set('textFilters', JSON.stringify(activeTextFilters.filters));
+  }
+  if (Object.keys(activeTextFilters.operators).length > 0) {
+    params = params.set('textOperators', JSON.stringify(activeTextFilters.operators));
   }
 
   return params;
 }
 
-/** Normalizes the sort direction into the API's lowercase convention. */
-function sortDirectionValue(direction: SortDirection): string {
-  return direction.toLowerCase();
+/** Keeps only non-empty text filter values and their operators. */
+function collectActiveTextFilters(query: CustomerQuery): {
+  filters: Record<string, string>;
+  operators: Record<string, string>;
+} {
+  const filters: Record<string, string> = {};
+  const operators: Record<string, string> = {};
+  for (const [key, value] of Object.entries(query.textFilters)) {
+    const trimmed = (value ?? '').trim();
+    if (!trimmed) {
+      continue;
+    }
+    filters[key] = trimmed;
+    const operator = query.textFilterOperators[key as CustomerTextFilterKey];
+    if (operator) {
+      operators[key] = operator;
+    }
+  }
+  return { filters, operators };
+}
+
+/** Guards the BFF lookups payload into a typed shape. */
+function normalizeCustomerLookups(raw: unknown): CustomerLookups {
+  if (typeof raw !== 'object' || raw === null) {
+    return { clientTypes: [], accountManagers: [], cities: [], countries: [] };
+  }
+  const record = raw as Record<string, unknown>;
+  return {
+    clientTypes: readOptions(record['clientTypes']),
+    accountManagers: readOptions(record['accountManagers']),
+    cities: readOptions(record['cities']),
+    countries: readOptions(record['countries']),
+  };
+}
+
+function readOptions(raw: unknown): { value: number; label: string }[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw
+    .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
+    .map((item) => ({
+      value: Number(item['value']),
+      label: String(item['label'] ?? ''),
+    }))
+    .filter((option) => Number.isFinite(option.value));
 }

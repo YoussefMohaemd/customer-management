@@ -11,7 +11,12 @@ import { CustomerReportDef } from '@features/customers/models/customer.model';
 import { DEFAULT_VISIBLE_CUSTOMER_COLUMNS } from '@features/customers/models/customer-column.model';
 import { customerFixture } from '@app/testing/test-utils.spec';
 
-const READ_URL = `${environment.api.baseUrl}${environment.api.endpoints.readAllCrmClients}`;
+const READ_URL = `${environment.api.bffBaseUrl}${environment.api.bff.customers}`;
+const LOOKUPS_URL = `${environment.api.bffBaseUrl}${environment.api.bff.lookups}`;
+const EXPORT_URL = `${environment.api.bffBaseUrl}${environment.api.bff.exportCustomers}`;
+const SAVE_URL = `${environment.api.bffBaseUrl}${environment.api.bff.saveCustomer}`;
+
+const READ_MATCH = (req: { url: string }) => req.url === READ_URL;
 
 function deployStore(): { store: CustomerStore; http: HttpTestingController } {
   TestBed.configureTestingModule({
@@ -20,10 +25,17 @@ function deployStore(): { store: CustomerStore; http: HttpTestingController } {
       provideHttpClientTesting(),
     ],
   });
-  return {
-    store: TestBed.inject(CustomerStore),
-    http: TestBed.inject(HttpTestingController),
-  };
+  const store = TestBed.inject(CustomerStore);
+  const http = TestBed.inject(HttpTestingController);
+  // The store warms the lookups endpoint in its constructor; settle it so it
+  // never interferes with request-count assertions.
+  http.expectOne((req) => req.url === LOOKUPS_URL).flush({
+    clientTypes: [],
+    accountManagers: [],
+    cities: [],
+    countries: [],
+  });
+  return { store, http };
 }
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -51,42 +63,231 @@ const reportFixture = (overrides: Partial<CustomerReportDef> = {}): CustomerRepo
   ...overrides,
 });
 
-describe('CustomerStore', () => {
-  describe('load pipeline', () => {
-    it('reload() fetches the matching set into signals', async () => {
+describe('CustomerStore (BFF server-side pipeline)', () => {
+  describe('one table-state change → one request', () => {
+    it('reload() requests ONLY page 1 with the default page size and applies {data, totalCount}', () => {
       const { store, http } = deployStore();
 
       store.reload();
       expect(store.loading()).toBe(true);
 
-      const request = http.expectOne((req) => req.url === READ_URL);
-      request.flush({ Data: [customerFixture({ id: 1 })], Total: 9 });
+      const request = http.expectOne(READ_MATCH);
+      expect(request.request.params.get('page')).toBe('1');
+      expect(request.request.params.get('pageSize')).toBe('5');
+      request.flush({
+        data: [customerFixture({ id: 1 }), customerFixture({ id: 2 })],
+        totalCount: 14111,
+      });
 
       expect(store.loading()).toBe(false);
       expect(store.error()).toBeNull();
-      expect(store.records()).toHaveLength(1);
-      expect(store.totalCount()).toBe(9);
+      // records() IS the server page — never more than pageSize.
+      expect(store.records().map((r) => r.id)).toEqual([1, 2]);
+      expect(store.totalCount()).toBe(14111);
       expect(store.isEmptyResult()).toBe(false);
     });
 
-    it('drops repeated identical queries (no duplicate requests)', async () => {
+    it('drops repeated identical queries (no duplicate requests)', () => {
       const { store, http } = deployStore();
 
       store.reload();
-      http.expectOne((req) => req.url === READ_URL).flush({ Data: [], Total: 0 });
+      http.expectOne(READ_MATCH).flush({ data: [], totalCount: 0 });
 
       store.reload();
-      // Fresh query state but identical parameters → short-circuited.
-      http.expectNone((req) => req.url === READ_URL);
+      // Fresh trigger but identical query → short-circuited before the network.
+      http.expectNone(READ_MATCH);
       expect(store.loading()).toBe(false);
     });
 
-    it('surfaces a 401 as a user-friendly error and clears it on retry', async () => {
+    it('refresh() bypasses the dedupe guard and issues a fresh request', () => {
+      const { store, http } = deployStore();
+
+      store.reload();
+      http.expectOne(READ_MATCH).flush({ data: [customerFixture({ id: 1 })], totalCount: 9 });
+
+      store.refresh();
+      const request = http.expectOne(READ_MATCH);
+      expect(request.request.params.get('page')).toBe('1');
+      request.flush({ data: [customerFixture({ id: 2 })], totalCount: 9 });
+      expect(store.records().map((r) => r.id)).toEqual([2]);
+    });
+  });
+
+  describe('server pagination', () => {
+    it('navigates pages through the BFF and drives the paginator from totalCount', () => {
       const { store, http } = deployStore();
 
       store.reload();
       http
-        .expectOne((req) => req.url === READ_URL)
+        .expectOne(READ_MATCH)
+        .flush({ data: Array.from({ length: 5 }, (_, i) => customerFixture({ id: i + 1 })), totalCount: 12 });
+      expect(store.totalRecords()).toBe(12);
+      expect(store.totalPages()).toBe(3);
+      expect(store.pageStartIndex()).toBe(1);
+      expect(store.pageEndIndex()).toBe(5);
+
+      store.setPage(2);
+      const page2 = http.expectOne(READ_MATCH);
+      expect(page2.request.params.get('page')).toBe('2');
+      expect(page2.request.params.get('pageSize')).toBe('5');
+      page2.flush({ data: Array.from({ length: 5 }, (_, i) => customerFixture({ id: 6 + i })), totalCount: 12 });
+
+      expect(store.page()).toBe(2);
+      expect(store.records().map((r) => r.id)).toEqual([6, 7, 8, 9, 10]);
+      expect(store.pageStartIndex()).toBe(6);
+      expect(store.pageEndIndex()).toBe(10);
+    });
+
+    it('page-size changes reset to page 1 and request the new size', () => {
+      const { store, http } = deployStore();
+
+      store.reload();
+      http.expectOne(READ_MATCH).flush({ data: [], totalCount: 50 });
+      store.setPage(3);
+      http.expectOne(READ_MATCH).flush({ data: [], totalCount: 50 });
+
+      store.setPageSize(10);
+      const request = http.expectOne(READ_MATCH);
+      expect(request.request.params.get('page')).toBe('1');
+      expect(request.request.params.get('pageSize')).toBe('10');
+      request.flush({ data: [], totalCount: 50 });
+      expect(store.page()).toBe(1);
+      expect(store.pageSize()).toBe(10);
+    });
+  });
+
+  describe('server-side search', () => {
+    it('debounces typing, fires one request and resets pagination to page 1', async () => {
+      const { store, http } = deployStore();
+
+      store.search('acme');
+      await delay(100);
+      store.search('acme corp');
+      await delay(100);
+      store.search('acme corp ltd');
+
+      http.expectNone(READ_MATCH);
+
+      await delay(450);
+      const request = http.expectOne(READ_MATCH);
+      expect(request.request.params.get('search')).toBe('acme corp ltd');
+      expect(request.request.params.get('page')).toBe('1');
+      request.flush({ data: [customerFixture({ id: 3 })], totalCount: 1 });
+
+      expect(store.searchTerm()).toBe('acme corp ltd');
+      expect(store.records()).toHaveLength(1);
+      expect(store.page()).toBe(1);
+    });
+
+    it('searching while on a later page returns to page 1', async () => {
+      const { store, http } = deployStore();
+
+      store.reload();
+      http.expectOne(READ_MATCH).flush({ data: [], totalCount: 100 });
+      store.setPage(4);
+      http.expectOne(READ_MATCH).flush({ data: [], totalCount: 100 });
+
+      store.search('john');
+      await delay(450);
+      const request = http.expectOne(READ_MATCH);
+      expect(request.request.params.get('page')).toBe('1');
+      expect(request.request.params.get('search')).toBe('john');
+      request.flush({ data: [], totalCount: 100 });
+    });
+  });
+
+  describe('server-side sort and filters', () => {
+    it('sends the canonical sort field and toggles direction', () => {
+      const { store, http } = deployStore();
+
+      store.setSort('accountManagerName');
+      const first = http.expectOne(READ_MATCH);
+      expect(first.request.params.get('sortField')).toBe('AccountManagerName');
+      expect(first.request.params.get('sortDirection')).toBe('asc');
+      expect(first.request.params.get('page')).toBe('1');
+      first.flush({ data: [], totalCount: 0 });
+
+      store.setSort('accountManagerName'); // same column → toggle
+      const second = http.expectOne(READ_MATCH);
+      expect(second.request.params.get('sortDirection')).toBe('desc');
+      second.flush({ data: [], totalCount: 0 });
+    });
+
+    it('sends text filters as JSON parameters', () => {
+      const { store, http } = deployStore();
+
+      store.setTextFilter('name', 'acme');
+      const request = http.expectOne(READ_MATCH);
+      expect(JSON.parse(request.request.params.get('textFilters')!)).toEqual({ name: 'acme' });
+      expect(JSON.parse(request.request.params.get('textOperators')!)).toEqual({
+        name: 'contains',
+      });
+      request.flush({ data: [], totalCount: 0 });
+
+      store.setTextFilter('name', '');
+      const cleared = http.expectOne(READ_MATCH);
+      expect(cleared.request.params.get('textFilters')).toBeNull();
+      cleared.flush({ data: [], totalCount: 0 });
+      expect(store.hasFilters()).toBe(false);
+    });
+
+    it('sends categorical filter ids', () => {
+      const { store, http } = deployStore();
+
+      store.setCategoricalFilter('clientTypeId', 12);
+      const request = http.expectOne(READ_MATCH);
+      expect(request.request.params.get('clientTypeId')).toBe('12');
+      request.flush({ data: [], totalCount: 0 });
+    });
+
+    it('clearing all filters reloads the unfiltered page 1', () => {
+      const { store, http } = deployStore();
+
+      store.setTextFilter('name', 'acme');
+      http.expectOne(READ_MATCH).flush({ data: [], totalCount: 0 });
+      store.setCategoricalFilter('cityId', 1);
+      http.expectOne(READ_MATCH).flush({ data: [], totalCount: 0 });
+
+      store.clearAllFilters();
+      const request = http.expectOne(READ_MATCH);
+      expect(request.request.params.get('textFilters')).toBeNull();
+      expect(request.request.params.get('cityId')).toBeNull();
+      expect(request.request.params.get('page')).toBe('1');
+      request.flush({ data: [], totalCount: 0 });
+      expect(store.totalFilterCount()).toBe(0);
+    });
+  });
+
+  describe('cancellation: the latest request wins', () => {
+    it('rapid refreshes cancel stale in-flight requests without clearing loading', () => {
+      const { store, http } = deployStore();
+
+      store.refresh(); // request A
+      store.refresh(); // request B supersedes A
+      expect(store.loading()).toBe(true);
+
+      const pending = http.match(READ_MATCH);
+      expect(pending.length).toBe(2);
+      // The stale request A was cancelled outright…
+      expect(pending[0].cancelled).toBe(true);
+      expect(pending[1].cancelled).toBe(false);
+      // …and its cancellation must NOT clear the loading flag of request B.
+      expect(store.loading()).toBe(true);
+
+      // Only the latest response can reach the UI.
+      pending[1].flush({ data: [customerFixture({ id: 99 })], totalCount: 12 });
+      expect(store.loading()).toBe(false);
+      expect(store.records().map((r) => r.id)).toEqual([99]);
+    });
+  });
+
+  describe('error handling', () => {
+    it('surfaces a 401 as a user-friendly error and clears it on retry', () => {
+      const { store, http } = deployStore();
+
+      store.reload();
+      http
+        .expectOne(READ_MATCH)
         .flush(null, { status: 401, statusText: 'Unauthorized' });
 
       expect(store.error()).toContain('not authorized');
@@ -96,287 +297,46 @@ describe('CustomerStore', () => {
       // Retry path issues a brand-new request.
       store.reload();
       http
-        .expectOne((req) => req.url === READ_URL)
-        .flush({ Data: [customerFixture({ id: 2 })], Total: 1 });
+        .expectOne(READ_MATCH)
+        .flush({ data: [customerFixture({ id: 2 })], totalCount: 1 });
       expect(store.error()).toBeNull();
       expect(store.records()).toHaveLength(1);
     });
   });
 
-  describe('debounced server-side search', () => {
-    it('debounces, keeps only the last term and fires one request', async () => {
-      const { store, http } = deployStore();
+  describe('lookups (BFF dropdown options)', () => {
+    it('loads distinct filter options in the background', () => {
+      const { store } = deployStore();
 
-      store.search('acme');
-      await delay(100);
-      store.search('acme corp');
-      await delay(100);
-      store.search('acme corp ltd');
-
-      http.expectNone((req) => req.url === READ_URL);
-
-      await delay(450);
-      const request = http.expectOne((req) => req.url === READ_URL);
-      expect(request.request.params.get('Text')).toBe('acme corp ltd');
-      request.flush({ Data: [customerFixture({ id: 3 })], Total: 1 });
-
-      expect(store.searchTerm()).toBe('acme corp ltd');
-      expect(store.records()).toHaveLength(1);
-      expect(store.page()).toBe(1);
-    });
-
-    it('clears search via an empty term (reloads the full set)', async () => {
-      const { store, http } = deployStore();
-
-      store.search('');
-      await delay(450);
-      const request = http.expectOne((req) => req.url === READ_URL);
-      expect(request.request.params.get('Text')).toBe('');
-      request.flush({ Data: [], Total: 0 });
-      expect(store.isEmptyResult()).toBe(true);
-    });
-  });
-
-  describe('cancellation: the latest request wins', () => {
-    it('rapid refreshes cancel stale in-flight requests without clearing loading', async () => {
-      const { store, http } = deployStore();
-
-      store.refresh(); // request A
-      store.refresh(); // request B supersedes A
-      expect(store.loading()).toBe(true);
-
-      const pending = http.match((req) => req.url === READ_URL);
-      expect(pending.length).toBe(2);
-      // The stale request A was cancelled outright…
-      expect(pending[0].cancelled).toBe(true);
-      expect(pending[1].cancelled).toBe(false);
-      // …and its cancellation must NOT clear the loading flag of request B.
-      expect(store.loading()).toBe(true);
-
-      // Only the latest response can reach the UI.
-      pending[1].flush({ Data: [customerFixture({ id: 99 })], Total: 12 });
-      expect(store.loading()).toBe(false);
-      expect(store.records().map((r) => r.id)).toEqual([99]);
-    });
-
-    it('serves pagination instantly from the cache — zero network traffic', async () => {
-      const { store, http } = deployStore();
-
-      store.reload();
-      http
-        .expectOne((req) => req.url === READ_URL)
-        .flush({
-          Data: Array.from({ length: 12 }, (_, i) => customerFixture({ id: i + 1 })),
-          Total: 12,
-        });
-
-      store.setPage(2);
-      store.setPage(3);
-
-      // The matching set is cached; page changes must never re-request it.
-      http.expectNone((req) => req.url === READ_URL);
-      expect(store.loading()).toBe(false);
-      expect(store.page()).toBe(3);
-      // 12 records / pageSize 5 → page 3 holds the last 2 rows.
-      expect(store.paginatedCustomers().map((r) => r.id)).toEqual([11, 12]);
-    });
-  });
-
-  describe('in-memory cache (legacy API — one request per search term)', () => {
-    it('serves repeated visits and identical reloads from the cache', async () => {
-      const { store, http } = deployStore();
-
-      store.reload();
-      http.expectOne((req) => req.url === READ_URL).flush({ Data: [customerFixture({ id: 1 })], Total: 9 });
-      expect(store.records()).toHaveLength(1);
-
-      // Re-visit with the identical query: deduped, no network.
-      store.reload();
-      http.expectNone((req) => req.url === READ_URL);
-      expect(store.records()).toHaveLength(1);
-
-      // A changed query for the SAME search term is served from the cache too.
-      store.setPage(1);
-      http.expectNone((req) => req.url === READ_URL);
-      expect(store.loading()).toBe(false);
-    });
-
-    it('refetches when the cache entry has expired', async () => {
-      const originalTtl = environment.customers.cacheTtlMs;
-      environment.customers.cacheTtlMs = 20;
-      try {
-        const { store, http } = deployStore();
-
-        store.reload();
-        http.expectOne((req) => req.url === READ_URL).flush({ Data: [customerFixture({ id: 1 })], Total: 9 });
-
-        await delay(30); // TTL elapsed
-
-        store.reload();
-        const request = http.expectOne((req) => req.url === READ_URL);
-        request.flush({ Data: [customerFixture({ id: 2 })], Total: 1 });
-        expect(store.records().map((r) => r.id)).toEqual([2]);
-      } finally {
-        environment.customers.cacheTtlMs = originalTtl;
-      }
-    });
-
-    it('refresh() busts the cache and refetches from the network', async () => {
-      const { store, http } = deployStore();
-
-      store.reload();
-      http.expectOne((req) => req.url === READ_URL).flush({ Data: [customerFixture({ id: 1 })], Total: 9 });
-
-      store.refresh();
-      const request = http.expectOne((req) => req.url === READ_URL);
-      expect(request.request.params.get('Text')).toBe('');
-      request.flush({ Data: [customerFixture({ id: 2 })], Total: 1 });
-      expect(store.records().map((r) => r.id)).toEqual([2]);
-    });
-
-    it('clears a stale error when a cached set is restored', async () => {
-      const { store, http } = deployStore();
-
-      store.reload();
-      http.expectOne((req) => req.url === READ_URL).flush({ Data: [customerFixture({ id: 1 })], Total: 9 });
-
-      store.search('missing'); // cold term → network failure
-      await delay(450);
-      http
-        .expectOne((req) => req.url === READ_URL)
-        .flush(null, { status: 500, statusText: 'Server Error' });
-      expect(store.error()).not.toBeNull();
-
-      store.clearSearch(); // back to the cached term → served from cache
-      await delay(450);
-      http.expectNone((req) => req.url === READ_URL);
-      expect(store.error()).toBeNull();
-      expect(store.records().map((r) => r.id)).toEqual([1]);
-    });
-  });
-
-  describe('query contract (legacy API — documented params only)', () => {
-    it('hits the network once per search term; page/sort/filter changes reuse the cached set', async () => {
-      const { store, http } = deployStore();
-
-      store.search('john');
-      store.setPageSize(50);
-      // The immediate (non-debounced) page-size change produced one request.
-      const initial = http.expectOne((req) => req.url === READ_URL);
-      expect(initial.request.params.get('Text')).toBe('john');
-      // The Postman collection documents exactly these three parameters.
-      expect(initial.request.params.keys().sort()).toEqual(['Direction', 'InCT', 'Text']);
-      initial.flush({
-        Data: Array.from({ length: 120 }, (_, i) => customerFixture({ id: i + 1 })),
-        Total: 120,
+      // The constructor request was settled by deployStore; lookups are a
+      // background concern and never block the table.
+      expect(store.lookups()).toEqual({
+        clientTypes: [],
+        accountManagers: [],
+        cities: [],
+        countries: [],
       });
-
-      store.setPage(2);
-      store.setSort('accountManagerName');
-      store.setCategoricalFilter('clientTypeId', 12);
-      store.setCategoricalFilter('countryId', 7);
-
-      // All client-side state changes resolve against the cached 'john' set.
-      http.expectNone((req) => req.url === READ_URL);
-      expect(store.page()).toBe(1); // sorting + filters reset pagination
-      // Client-side categorical filtering still works over the cached set:
-      // fixtures have accountTypeId 12 but countryId 2 → the country filter
-      // legitimately empties the result.
-      expect(store.categoricalFilteredRecords()).toHaveLength(0);
-      expect(store.totalPages()).toBe(1);
-
-      store.clearCategoricalFilters();
-      expect(store.categoricalFilteredRecords()).toHaveLength(120);
-      expect(store.totalPages()).toBe(3); // 120 records / pageSize 50
-
-      // The debounced search resolves against the cache as well.
-      await delay(450);
-      http.expectNone((req) => req.url === READ_URL);
+      expect(store.clientTypeOptions()).toEqual([]);
     });
   });
 
-  describe('text filters', () => {
-    it('reloads immediately when a text filter changes', async () => {
+  describe('export', () => {
+    it('fetches the full matching set from the export endpoint (no pagination)', () => {
       const { store, http } = deployStore();
 
-      store.setTextFilter('name', 'acme');
-      await delay(20);
+      let exported: { id: number }[] = [];
+      store
+        .exportAll()
+        .subscribe((records) => (exported = records));
 
-      const request = http.expectOne((req) => req.url === READ_URL);
-      // Only the search-box term goes into Text; per-field filters apply client-side.
-      expect(request.request.params.get('Text')).toBe('');
-      request.flush({ Data: [], Total: 0 });
-
-      expect(store.textFilters().name).toBe('acme');
-      expect(store.totalFilterCount()).toBe(1);
-    });
-
-    it('removing the filter value clears it and reloads', async () => {
-      const { store, http } = deployStore();
-
-      store.setTextFilter('name', '');
-      await delay(20);
-      const request = http.expectOne((req) => req.url === READ_URL);
-      expect(request.request.params.get('Text')).toBe('');
-      request.flush({ Data: [], Total: 0 });
-
-      expect(store.textFilters().name).toBeUndefined();
-      expect(store.hasFilters()).toBe(false);
-    });
-
-    it('narrows the loaded set client-side so matching rows are shown', () => {
-      const { store, http } = deployStore();
-
-      store.reload();
-      http
-        .expectOne((req) => req.url === READ_URL)
-        .flush({
-          Data: [
-            customerFixture({ id: 1, email: 'salma@example.com' }),
-            customerFixture({ id: 2, email: 'other@example.com' }),
-            customerFixture({ id: 3, email: 'salma2@example.com' }),
-          ],
-          Total: 3,
-        });
-
-      store.setTextFilter('email', 'salma');
-      expect(store.filteredRecords().map((r) => r.id)).toEqual([1, 3]);
-      expect(store.textFilters().email).toBe('salma');
-
-      store.setTextFilter('email', '');
-      expect(store.filteredRecords().map((r) => r.id)).toEqual([1, 2, 3]);
-    });
-  });
-
-  describe('categorical filters (client-side over the loaded set)', () => {
-    it('filters, sorts and paginates derived state from real records', async () => {
-      const { store, http } = deployStore();
-
-      store.reload();
-      http
-        .expectOne((req) => req.url === READ_URL)
-        .flush({
-          Data: [
-            customerFixture({ id: 1, accountTypeId: 12, cityId: 1 }),
-            customerFixture({ id: 2, accountTypeId: 7, cityId: 2 }),
-            customerFixture({ id: 3, accountTypeId: 12, cityId: 1 }),
-          ],
-          Total: 3,
-        });
-
-      store.setCategoricalFilter('clientTypeId', 12);
-      expect(store.categoricalFilteredRecords().map((r) => r.id)).toEqual([1, 3]);
-
-      store.setSort('id');
-      store.setPage(1);
-      expect(store.sortedRecords().map((r) => r.id)).toEqual([1, 3]);
-
-      store.clearCategoricalFilters();
-      store.setPageSize(2);
-      expect(store.paginatedCustomers()).toHaveLength(2);
-      expect(store.totalPages()).toBe(2);
-      store.setPage(2);
-      expect(store.paginatedCustomers().map((r) => r.id)).toEqual([3]);
+      const request = http.expectOne((req) => req.url === EXPORT_URL);
+      expect(request.request.params.get('page')).toBeNull();
+      expect(request.request.params.get('pageSize')).toBeNull();
+      request.flush({
+        data: [customerFixture({ id: 1 }), customerFixture({ id: 2 })],
+        totalCount: 2,
+      });
+      expect(exported.map((r) => r.id)).toEqual([1, 2]);
     });
   });
 
@@ -395,25 +355,24 @@ describe('CustomerStore', () => {
       expect(store.isSelected(42)).toBe(false);
     });
 
-    it('keeps selections across pagination and reconciles PrimeNG events', async () => {
+    it('keeps selections across server pages and reconciles PrimeNG events', () => {
       const { store, http } = deployStore();
 
       store.reload();
       http
-        .expectOne((req) => req.url === READ_URL)
-        .flush({
-          Data: Array.from({ length: 12 }, (_, i) => customerFixture({ id: i + 1 })),
-          Total: 12,
-        });
+        .expectOne(READ_MATCH)
+        .flush({ data: Array.from({ length: 5 }, (_, i) => customerFixture({ id: i + 1 })), totalCount: 12 });
 
       store.selectAction(actionFixture());
       expect(store.selectionEnabled()).toBe(true);
 
-      store.setPageSize(5);
       store.syncSelection(store.paginatedCustomers().slice(0, 2));
       expect(store.selectedRecordsForAction().map((r) => r.id)).toEqual([1, 2]);
 
       store.setPage(2);
+      http
+        .expectOne(READ_MATCH)
+        .flush({ data: Array.from({ length: 5 }, (_, i) => customerFixture({ id: 6 + i })), totalCount: 12 });
       const page2 = store.paginatedCustomers();
       store.syncSelection([...store.selectedOnPage(), ...page2.slice(0, 2)]);
       expect(
@@ -425,6 +384,9 @@ describe('CustomerStore', () => {
 
       // The header checkbox "select all on page" also lands in the store.
       store.setPage(1);
+      http
+        .expectOne(READ_MATCH)
+        .flush({ data: Array.from({ length: 5 }, (_, i) => customerFixture({ id: i + 1 })), totalCount: 12 });
       store.syncSelection(store.paginatedCustomers());
       expect(
         store
@@ -444,8 +406,6 @@ describe('CustomerStore', () => {
       const { store } = deployStore();
 
       store.selectAction(actionFixture());
-      // Columns follow the canonical catalog order; the override only
-      // controls WHICH columns are shown, not their order.
       expect(new Set(store.selectedColumnDefs().map((c) => c.field))).toEqual(
         new Set(['accountManagerName', 'code', 'commercialName']),
       );
@@ -500,11 +460,11 @@ describe('CustomerStore', () => {
   });
 
   describe('save flow', () => {
-    it('saves, closes saving state and refreshes the list on success', async () => {
+    it('saves, closes saving state and refreshes the list on success', () => {
       const { store, http } = deployStore();
 
       store.reload();
-      http.expectOne((req) => req.url === READ_URL).flush({ Data: [], Total: 0 });
+      http.expectOne(READ_MATCH).flush({ data: [], totalCount: 0 });
 
       let saved = false;
       store.saveCustomer(store.createPayload()).subscribe({
@@ -514,7 +474,7 @@ describe('CustomerStore', () => {
 
       expect(store.saving()).toBe(true);
       http
-        .expectOne((req) => req.method === 'POST')
+        .expectOne((req) => req.method === 'POST' && req.url === SAVE_URL)
         .flush({
           Result: true,
           ErrorMessage: 'Saved Successfully || Id : 77',
@@ -522,22 +482,22 @@ describe('CustomerStore', () => {
       expect(store.saving()).toBe(false);
       expect(saved).toBe(true);
 
-      // Success triggers a fresh list fetch.
+      // Success triggers a fresh list fetch through the BFF.
       http
-        .expectOne((req) => req.url === READ_URL)
-        .flush({ Data: [customerFixture({ id: 77 })], Total: 1 });
+        .expectOne(READ_MATCH)
+        .flush({ data: [customerFixture({ id: 77 })], totalCount: 1 });
       expect(store.records().map((r) => r.id)).toEqual([77]);
       expect(store.saveError()).toBeNull();
     });
 
-    it('keeps the dialog state and reports save failures', async () => {
+    it('keeps the dialog state and reports save failures', () => {
       const { store, http } = deployStore();
 
       store.openCreateForm();
       store.saveCustomer(store.createPayload()).subscribe({ error: () => undefined });
 
       http
-        .expectOne((req) => req.method === 'POST')
+        .expectOne((req) => req.method === 'POST' && req.url === SAVE_URL)
         .flush({ Result: false, ErrorMessage: 'Sorry,Mobile already Exist.' });
       expect(store.saving()).toBe(false);
       expect(store.saveError()).toBe('Sorry,Mobile already Exist.');
@@ -563,11 +523,3 @@ describe('CustomerStore', () => {
     });
   });
 });
-
-/** Flushes whatever read request is currently pending (returns no record set). */
-function await_flush(http: HttpTestingController): void {
-  const pending = http.match((req) => req.url === READ_URL);
-  for (const request of pending) {
-    request.flush({ Data: [], Total: 0 });
-  }
-}
