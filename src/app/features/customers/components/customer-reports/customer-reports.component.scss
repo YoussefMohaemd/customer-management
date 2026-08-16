@@ -1,3 +1,62 @@
 :host {
   display: block;
 }
+
+.report-card {
+  border-color: #e2e8f0;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: #93c5fd;
+    box-shadow:
+      0 4px 6px -1px rgb(0 0 0 / 0.07),
+      0 2px 4px -2px rgb(0 0 0 / 0.05);
+  }
+
+  &:focus-visible {
+    outline: none;
+    border-color: #60a5fa;
+    box-shadow:
+      0 0 0 2px rgb(59 130 246 / 0.6),
+      0 4px 6px -1px rgb(0 0 0 / 0.07);
+  }
+
+  &--active {
+    border-color: #3b82f6;
+    background-color: rgb(239 246 255 / 0.45);
+    box-shadow:
+      0 0 0 2px rgb(59 130 246 / 0.35),
+      0 4px 12px -2px rgb(59 130 246 / 0.25),
+      0 2px 4px -2px rgb(59 130 246 / 0.1);
+
+    &:hover {
+      border-color: #3b82f6;
+      box-shadow:
+        0 0 0 2px rgb(59 130 246 / 0.35),
+        0 6px 14px -2px rgb(59 130 246 / 0.3);
+    }
+
+    &:focus-visible {
+      border-color: #3b82f6;
+      box-shadow:
+        0 0 0 2px rgb(59 130 246 / 0.6),
+        0 4px 12px -2px rgb(59 130 246 / 0.25);
+    }
+  }
+}
+
+.active-badge {
+  border-radius: 0.25rem;
+  background-color: #dbeafe;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1.25rem;
+  color: #1d4ed8;
+  white-space: nowrap;
+}

@@ -3,14 +3,34 @@ import {
   SEARCH_FIELDS,
   TEXT_FILTER_FIELDS,
   firstValue,
+  isReportFieldSet,
   resolveSortField,
 } from './fields.js';
 
 /**
+ * Server-side report criteria — the single source of truth for what each
+ * Reports-section card filters to. Keyed by the canonical report ids the
+ * Angular app sends as the `report` query param; expressed on canonical
+ * field keys resolved through `REPORT_FIELD_MAP`/`isReportFieldSet` so the
+ * BFF never needs to know about frontend presentation concerns.
+ *
+ * The criteria mirror the declarative `filterCriteria` carried by each
+ * report card definition in `customer-reports.component.ts`.
+ */
+export const CUSTOMER_REPORT_CRITERIA = {
+  /** Customers with contact channels on record (email, mobile or phone). */
+  contacts: { anyOf: ['email', 'mobile', 'phone'] },
+  /** Customers already assigned to an account manager (managed accounts). */
+  customers: { allOf: ['accountManagerId'] },
+  /** Accounts with no manager assigned yet — the follow-up queue. */
+  'account-follow-up': { noneOf: ['accountManagerId'] },
+};
+
+/**
  * Server-side table-state pipeline over the cached dataset:
  *
- *   cached records → search → categorical filters → text filters
- *                   → sort → paginate → ONLY the requested page
+ *   cached records → report criteria → search → categorical filters
+ *                   → text filters → sort → paginate → ONLY the requested page
  *
  * Mirrors the client-side semantics the legacy implementation applied over the
  * full dump (same field resolution, same operators, same numeric handling),
@@ -33,6 +53,7 @@ import {
 export function queryDataset(records, params, { paginate = true } = {}) {
   let list = records;
 
+  list = applyReportCriteria(list, params);
   list = applySearch(list, params.get('search'));
   list = applyCategoricalFilters(list, params);
   list = applyTextFilters(list, params);
@@ -76,6 +97,33 @@ export function buildLookups(records) {
  */
 const searchIndexCache = new WeakMap();
 const sortKeyCache = new WeakMap();
+
+/**
+ * Applies the active report's server-side criteria (the `report` query param
+ * set by the Reports section). Unknown/absent report ids are ignored so a
+ * report that is cleared or not yet known leaves the result set untouched.
+ */
+function applyReportCriteria(list, params) {
+  const reportId = params.get('report');
+  const criteria = CUSTOMER_REPORT_CRITERIA[reportId];
+  if (!criteria) {
+    return list;
+  }
+  return list.filter((record) => matchesReportCriteria(record, criteria));
+}
+
+function matchesReportCriteria(record, criteria) {
+  if (criteria.anyOf && !criteria.anyOf.some((key) => isReportFieldSet(record, key))) {
+    return false;
+  }
+  if (criteria.allOf && !criteria.allOf.every((key) => isReportFieldSet(record, key))) {
+    return false;
+  }
+  if (criteria.noneOf && criteria.noneOf.some((key) => isReportFieldSet(record, key))) {
+    return false;
+  }
+  return true;
+}
 
 function applySearch(list, rawSearch) {
   const term = (rawSearch ?? '').trim().toLowerCase();

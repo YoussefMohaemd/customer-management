@@ -107,6 +107,21 @@ describe('CustomerService (BFF contract)', () => {
     expect(records?.records[0].accountTypeId).toBeNull();
   });
 
+  it('sends the active report id so the BFF applies its server-side criteria', () => {
+    service
+      .fetchCustomers({
+        ...createEmptyCustomerQuery(),
+        report: 'contacts',
+        page: 1,
+        pageSize: 5,
+      })
+      .subscribe();
+
+    const request = http.expectOne((req) => req.url === READ_URL);
+    expect(request.request.params.get('report')).toBe('contacts');
+    request.flush({ data: [], totalCount: 13868 });
+  });
+
   it('fetchCustomersForExport omits pagination and returns all matching records', () => {
     let records: CustomerListResult['records'] | undefined;
     service

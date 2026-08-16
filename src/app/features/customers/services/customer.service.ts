@@ -35,8 +35,11 @@ import {
  * Request contract (BFF):
  *   GET {bff}/customers?page=&pageSize=&search=&sortField=&sortDirection=
  *       &clientTypeId=&accountManagerId=&cityId=&countryId=
- *       &textFilters={json}&textOperators={json}
+ *       &textFilters={json}&textOperators={json}&report={reportId}
  *   → { "data": Customer[], "totalCount": number }  (data = ONLY current page)
+ *
+ *   `report` (optional) names the active Reports-section card; the BFF applies
+ *   that report's server-side criteria before search/filter/sort/pagination.
  *
  *   GET {bff}/customers/lookups   → { clientTypes, accountManagers, cities, countries }
  *   GET {bff}/customers/export    → { data: [...all matching], totalCount }
@@ -74,9 +77,7 @@ export class CustomerService {
   /** Creates (Id = 0) or updates (existing Id) a customer through the BFF,
    *  which proxies `SaveCustomerWithContactPerson` and refreshes its cache. */
   saveCustomer(payload: CustomerPayload): Observable<SaveCustomerResult> {
-    return this.http
-      .post(this.saveEndpoint, payload)
-      .pipe(map(normalizeSaveCustomerResult));
+    return this.http.post(this.saveEndpoint, payload).pipe(map(normalizeSaveCustomerResult));
   }
 }
 
@@ -128,10 +129,7 @@ const SORT_FIELD_MAP: Record<CustomerSortField, string> = {
  * real table-state change produces exactly one request and the BFF returns
  * only the requested page.
  */
-export function buildCustomerQueryParams(
-  query: CustomerQuery,
-  paginate = true,
-): HttpParams {
+export function buildCustomerQueryParams(query: CustomerQuery, paginate = true): HttpParams {
   let params = new HttpParams();
 
   if (paginate) {
@@ -147,6 +145,10 @@ export function buildCustomerQueryParams(
     params = params
       .set('sortField', SORT_FIELD_MAP[query.sortField])
       .set('sortDirection', query.sortDirection);
+  }
+
+  if (query.report) {
+    params = params.set('report', query.report);
   }
 
   if (query.filters.clientTypeId !== null) {

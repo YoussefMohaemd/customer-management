@@ -29,12 +29,14 @@ function deployStore(): { store: CustomerStore; http: HttpTestingController } {
   const http = TestBed.inject(HttpTestingController);
   // The store warms the lookups endpoint in its constructor; settle it so it
   // never interferes with request-count assertions.
-  http.expectOne((req) => req.url === LOOKUPS_URL).flush({
-    clientTypes: [],
-    accountManagers: [],
-    cities: [],
-    countries: [],
-  });
+  http
+    .expectOne((req) => req.url === LOOKUPS_URL)
+    .flush({
+      clientTypes: [],
+      accountManagers: [],
+      cities: [],
+      countries: [],
+    });
   return { store, http };
 }
 
@@ -52,14 +54,15 @@ const actionFixture = (overrides: Partial<CustomerActionDef> = {}): CustomerActi
 });
 
 const reportFixture = (overrides: Partial<CustomerReportDef> = {}): CustomerReportDef => ({
-  id: 'customer-list',
-  icon: 'pi-list',
-  title: 'Customer List',
-  subtitle: 'Full customer register with filters',
-  accent: 'from-blue-500 to-indigo-600',
-  requiredColumns: ['id', 'code', 'commercialName'],
-  defaultSortField: 'code',
+  id: 'contacts',
+  icon: 'pi-phone',
+  title: 'Contacts Report',
+  subtitle: 'Report For Contacts.',
+  accent: 'blue',
+  requiredColumns: ['id', 'code', 'commercialName', 'email', 'mobile', 'phone'],
+  defaultSortField: 'commercialName',
   defaultSortDirection: 'asc',
+  filterCriteria: { anyOf: ['email', 'mobile', 'phone'] },
   ...overrides,
 });
 
@@ -120,7 +123,10 @@ describe('CustomerStore (BFF server-side pipeline)', () => {
       store.reload();
       http
         .expectOne(READ_MATCH)
-        .flush({ data: Array.from({ length: 5 }, (_, i) => customerFixture({ id: i + 1 })), totalCount: 12 });
+        .flush({
+          data: Array.from({ length: 5 }, (_, i) => customerFixture({ id: i + 1 })),
+          totalCount: 12,
+        });
       expect(store.totalRecords()).toBe(12);
       expect(store.totalPages()).toBe(3);
       expect(store.pageStartIndex()).toBe(1);
@@ -130,7 +136,10 @@ describe('CustomerStore (BFF server-side pipeline)', () => {
       const page2 = http.expectOne(READ_MATCH);
       expect(page2.request.params.get('page')).toBe('2');
       expect(page2.request.params.get('pageSize')).toBe('5');
-      page2.flush({ data: Array.from({ length: 5 }, (_, i) => customerFixture({ id: 6 + i })), totalCount: 12 });
+      page2.flush({
+        data: Array.from({ length: 5 }, (_, i) => customerFixture({ id: 6 + i })),
+        totalCount: 12,
+      });
 
       expect(store.page()).toBe(2);
       expect(store.records().map((r) => r.id)).toEqual([6, 7, 8, 9, 10]);
@@ -286,9 +295,7 @@ describe('CustomerStore (BFF server-side pipeline)', () => {
       const { store, http } = deployStore();
 
       store.reload();
-      http
-        .expectOne(READ_MATCH)
-        .flush(null, { status: 401, statusText: 'Unauthorized' });
+      http.expectOne(READ_MATCH).flush(null, { status: 401, statusText: 'Unauthorized' });
 
       expect(store.error()).toContain('not authorized');
       expect(store.loading()).toBe(false);
@@ -296,9 +303,7 @@ describe('CustomerStore (BFF server-side pipeline)', () => {
 
       // Retry path issues a brand-new request.
       store.reload();
-      http
-        .expectOne(READ_MATCH)
-        .flush({ data: [customerFixture({ id: 2 })], totalCount: 1 });
+      http.expectOne(READ_MATCH).flush({ data: [customerFixture({ id: 2 })], totalCount: 1 });
       expect(store.error()).toBeNull();
       expect(store.records()).toHaveLength(1);
     });
@@ -325,9 +330,7 @@ describe('CustomerStore (BFF server-side pipeline)', () => {
       const { store, http } = deployStore();
 
       let exported: { id: number }[] = [];
-      store
-        .exportAll()
-        .subscribe((records) => (exported = records));
+      store.exportAll().subscribe((records) => (exported = records));
 
       const request = http.expectOne((req) => req.url === EXPORT_URL);
       expect(request.request.params.get('page')).toBeNull();
@@ -361,7 +364,10 @@ describe('CustomerStore (BFF server-side pipeline)', () => {
       store.reload();
       http
         .expectOne(READ_MATCH)
-        .flush({ data: Array.from({ length: 5 }, (_, i) => customerFixture({ id: i + 1 })), totalCount: 12 });
+        .flush({
+          data: Array.from({ length: 5 }, (_, i) => customerFixture({ id: i + 1 })),
+          totalCount: 12,
+        });
 
       store.selectAction(actionFixture());
       expect(store.selectionEnabled()).toBe(true);
@@ -372,7 +378,10 @@ describe('CustomerStore (BFF server-side pipeline)', () => {
       store.setPage(2);
       http
         .expectOne(READ_MATCH)
-        .flush({ data: Array.from({ length: 5 }, (_, i) => customerFixture({ id: 6 + i })), totalCount: 12 });
+        .flush({
+          data: Array.from({ length: 5 }, (_, i) => customerFixture({ id: 6 + i })),
+          totalCount: 12,
+        });
       const page2 = store.paginatedCustomers();
       store.syncSelection([...store.selectedOnPage(), ...page2.slice(0, 2)]);
       expect(
@@ -386,7 +395,10 @@ describe('CustomerStore (BFF server-side pipeline)', () => {
       store.setPage(1);
       http
         .expectOne(READ_MATCH)
-        .flush({ data: Array.from({ length: 5 }, (_, i) => customerFixture({ id: i + 1 })), totalCount: 12 });
+        .flush({
+          data: Array.from({ length: 5 }, (_, i) => customerFixture({ id: i + 1 })),
+          totalCount: 12,
+        });
       store.syncSelection(store.paginatedCustomers());
       expect(
         store
@@ -430,8 +442,11 @@ describe('CustomerStore (BFF server-side pipeline)', () => {
         'id',
         'code',
         'commercialName',
+        'email',
+        'mobile',
+        'phone',
       ]);
-      expect(store.sortField()).toBe('code');
+      expect(store.sortField()).toBe('commercialName');
       expect(store.sortDirection()).toBe('asc');
 
       store.clearReport();
@@ -459,6 +474,73 @@ describe('CustomerStore (BFF server-side pipeline)', () => {
     });
   });
 
+  describe('reports filter the table data source', () => {
+    it('selecting a report sends its id to the BFF; clearing it drops the param', () => {
+      const { store, http } = deployStore();
+
+      store.selectReport(reportFixture());
+      let request = http.expectOne(READ_MATCH);
+      expect(request.request.params.get('report')).toBe('contacts');
+      request.flush({ data: [customerFixture({ id: 1 })], totalCount: 13868 });
+
+      expect(store.records().map((r) => r.id)).toEqual([1]);
+
+      store.clearReport();
+      request = http.expectOne(READ_MATCH);
+      expect(request.request.params.get('report')).toBeNull();
+      request.flush({ data: [customerFixture({ id: 2 })], totalCount: 14111 });
+      expect(store.records().map((r) => r.id)).toEqual([2]);
+    });
+
+    it('clicking the active report again clears it (toggle) and reloads unfiltered', () => {
+      const { store, http } = deployStore();
+
+      store.selectReport(reportFixture());
+      http.expectOne(READ_MATCH).flush({ data: [], totalCount: 13868 });
+      expect(store.activeReport()).not.toBeNull();
+
+      store.selectReport(reportFixture());
+      expect(store.activeReport()).toBeNull();
+      const request = http.expectOne(READ_MATCH);
+      expect(request.request.params.get('report')).toBeNull();
+      request.flush({ data: [], totalCount: 14111 });
+    });
+
+    it('switching reports issues one request even when the sort stays identical', () => {
+      const { store, http } = deployStore();
+
+      store.selectReport(reportFixture({ id: 'customers', defaultSortField: 'id' }));
+      let request = http.expectOne(READ_MATCH);
+      expect(request.request.params.get('report')).toBe('customers');
+      request.flush({ data: [], totalCount: 13683 });
+
+      // Same sort as the previous report, different report id → not deduped.
+      store.selectReport(reportFixture({ id: 'account-follow-up', defaultSortField: 'id' }));
+      request = http.expectOne(READ_MATCH);
+      expect(request.request.params.get('report')).toBe('account-follow-up');
+      request.flush({ data: [], totalCount: 428 });
+    });
+
+    it('report selection stays active across pagination and page-size changes', () => {
+      const { store, http } = deployStore();
+
+      store.selectReport(reportFixture());
+      http.expectOne(READ_MATCH).flush({ data: [], totalCount: 13868 });
+
+      store.setPage(2);
+      let request = http.expectOne(READ_MATCH);
+      expect(request.request.params.get('report')).toBe('contacts');
+      expect(request.request.params.get('page')).toBe('2');
+      request.flush({ data: [], totalCount: 13868 });
+
+      store.setPageSize(10);
+      request = http.expectOne(READ_MATCH);
+      expect(request.request.params.get('report')).toBe('contacts');
+      expect(request.request.params.get('pageSize')).toBe('10');
+      request.flush({ data: [], totalCount: 13868 });
+    });
+  });
+
   describe('save flow', () => {
     it('saves, closes saving state and refreshes the list on success', () => {
       const { store, http } = deployStore();
@@ -483,9 +565,7 @@ describe('CustomerStore (BFF server-side pipeline)', () => {
       expect(saved).toBe(true);
 
       // Success triggers a fresh list fetch through the BFF.
-      http
-        .expectOne(READ_MATCH)
-        .flush({ data: [customerFixture({ id: 77 })], totalCount: 1 });
+      http.expectOne(READ_MATCH).flush({ data: [customerFixture({ id: 77 })], totalCount: 1 });
       expect(store.records().map((r) => r.id)).toEqual([77]);
       expect(store.saveError()).toBeNull();
     });

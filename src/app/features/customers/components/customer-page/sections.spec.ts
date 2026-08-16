@@ -51,12 +51,11 @@ describe('CustomerReportsComponent', () => {
     fixture.detectChanges();
   });
 
-  it('renders the four report cards from the reference', () => {
+  it('renders the three report cards from the reference', () => {
     const text = fixture.nativeElement.textContent ?? '';
-    expect(text).toContain('Customer List');
-    expect(text).toContain('Customers by Country');
-    expect(text).toContain('New Customers / Month');
-    expect(text).toContain('Top Account Managers');
+    expect(text).toContain('Contacts Report');
+    expect(text).toContain('Customer Report');
+    expect(text).toContain('Account Follow Up Report');
   });
 
   it('opens a toast when a report is clicked', () => {
@@ -66,9 +65,7 @@ describe('CustomerReportsComponent', () => {
     const button = fixture.nativeElement.querySelectorAll('button')[0];
     button?.click();
 
-    expect(addSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ summary: 'Customer List' }),
-    );
+    expect(addSpy).toHaveBeenCalledWith(expect.objectContaining({ summary: 'Contacts Report' }));
   });
 });
 

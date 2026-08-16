@@ -2,18 +2,14 @@
  * Global test bootstrap for the `@angular/build:unit-test` runner.
  * Stubs browser APIs that PrimeNG components rely on and that jsdom
  * does not implement natively.
+ *
+ * NOTE: the runner already initializes the TestBed environment via its own
+ * `init-testbed` setup (BrowserTestingModule + platformBrowserTesting), so
+ * this file must NOT call `initTestEnvironment` again.
  */
 
 import 'zone.js';
 import 'zone.js/testing';
-
-import { getTestBed } from '@angular/core/testing';
-import {
-  BrowserDynamicTestingModule,
-  platformBrowserDynamicTesting,
-} from '@angular/platform-browser-dynamic/testing';
-
-getTestBed().initTestEnvironment(BrowserDynamicTestingModule, platformBrowserDynamicTesting());
 
 class ResizeObserverStub {
   observe(): void {}

@@ -1,6 +1,5 @@
 <div class="page-shell">
   <!-- Page heading -->
-  
 
   <!-- Error state -->
   @if (store.error() && !store.loading()) {
@@ -74,7 +73,8 @@
             <div class="flex items-center gap-2">
               <i class="pi pi-bolt text-blue-600" aria-hidden="true"></i>
               <span>
-                Active Action: <strong>{{ action.title }}</strong> — table layout and required columns synchronized.
+                Active Action: <strong>{{ action.title }}</strong> — table layout and required
+                columns synchronized.
                 @if (action.requiresSelection) {
                   <span class="ml-2 font-semibold text-blue-700">
                     ({{ store.selectedRecordsForAction().length }} customers selected)
@@ -100,7 +100,10 @@
             <div class="flex items-center gap-2">
               <i class="pi pi-chart-bar text-indigo-600" aria-hidden="true"></i>
               <span>
-                Active Report: <strong>{{ report.title }}</strong> — sorted by {{ store.sortField() || report.defaultSortField }} ({{ store.sortDirection() }}).
+                Active Report: <strong>{{ report.title }}</strong> — table filtered to report
+                criteria, sorted by {{ store.sortField() || report.defaultSortField }} ({{
+                  store.sortDirection()
+                }}).
               </span>
             </div>
             <button
@@ -200,13 +203,15 @@
 
   <!-- Actions -->
   <section class="section-card" aria-label="Customer actions">
-    <h2 class="section-heading">Actions</h2>
+    <h1 class="section-heading">Actions</h1>
+    <h2 class="section-subheading">Manage customers related actions and operations</h2>
     <app-customer-actions />
   </section>
 
   <!-- Reports -->
   <section class="section-card" aria-label="Reports">
-    <h2 class="section-heading">Reports</h2>
+    <h1 class="section-heading">Reports</h1>
+    <h2 class="section-subheading">Manage customers related reports.</h2>
     <app-customer-reports />
   </section>
 </div>

@@ -13,7 +13,7 @@ const MAX_BODY_BYTES = 1024 * 1024;
  *   GET  /api/health             → cache/upstream diagnostics
  *   GET  /api/customers          → paged table state (page, pageSize, search,
  *                                  sortField, sortDirection, categorical ids,
- *                                  textFilters/textOperators JSON)
+ *                                  textFilters/textOperators JSON, report id)
  *   GET  /api/customers/export   → full matching set (search + filters + sort)
  *   GET  /api/customers/lookups  → distinct filter dropdown options
  *   POST /api/customers/save     → SaveCustomerWithContactPerson proxy;

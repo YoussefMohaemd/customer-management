@@ -67,7 +67,7 @@ export class CustomerFormComponent {
   protected readonly today = new Date();
 
   protected readonly form = new FormGroup({
-    code: new FormControl('', [Validators.maxLength(50)]),
+    code: new FormControl('', [Validators.required,Validators.maxLength(50)]),
     commercialName: new FormControl('', [Validators.required, Validators.maxLength(200)]),
     nameAR: new FormControl('', [Validators.maxLength(100)]),
     nameEN: new FormControl('', [Validators.maxLength(100)]),

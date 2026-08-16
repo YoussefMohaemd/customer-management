@@ -52,7 +52,7 @@ The module lets ERP users:
 - add and edit customers in a large responsive modal form,
 - export the current result set to Excel,
 - configure which columns are visible via a searchable column picker,
-- and explore the documented "Actions" (Collective Reassign, Customer Follow Up, Upload Bulk) and "Reports" (Customer List, Customers by Country, New Customers/Month, Top Account Managers) ERP sections.
+- and explore the documented "Actions" (Collective Reassign, Customer Follow Up, Upload Bulk) and "Reports" (Contacts Report, Customer Report, Account Follow Up Report) ERP sections — each report genuinely filters the table server-side.
 
 The UI intentionally replicates the supplied assessment screenshots: dark ERP sidebar with active-state rail + star indicator, top header with global search/language/notifications/profile, white rounded card containing the toolbar/table, filter chips, actions dropdown per row, page-size paginator, and the tiles below the grid.
 
@@ -66,7 +66,7 @@ The UI intentionally replicates the supplied assessment screenshots: dark ERP si
 | Pagination      | **True server-side** — the BFF returns only the requested page + total count; 5/10/20 per page                  |
 | Sorting         | Any column, asc/desc, natural sort, stable id tie-break, resets to page 1, server-side                          |
 | Columns         | Searchable column picker; a 31-field catalog drives the table, filter panel and picker; ≥1 column enforced      |
-| Actions/Reports | Tiles that synchronize table columns, sort and selection state with the store                                  |
+| Actions/Reports | Tiles that synchronize table columns, sort, server-side filtering and selection state with the store |
 | Create / Edit   | Shared reactive form, validation, `SaveCustomerWithContactPerson` proxied by the BFF                            |
 | Export          | SheetJS Excel export of the full filtered + sorted result set via the BFF export endpoint                       |
 | Responsive      | Sidebar collapse + mobile drawer, 4→2→1 column form grid                                                        |
@@ -121,7 +121,7 @@ No unnecessary frontend libraries were added. Everything else uses native Angula
         │   │   ├── customer-column-picker/ # Searchable column selector with chip strip
         │   │   ├── customer-actions-menu/  # Row actions dropdown
         │   │   ├── customer-actions/    # "Collective Reassign / Follow Up / Upload Bulk" tiles
-        │   │   ├── customer-reports/    # "Customer List / By Country / New / Top Managers" tiles
+        │   │   ├── customer-reports/    # "Contacts / Customers / Account Follow Up" tiles
         │   │   ├── customer-form/       # Reusable create/edit/view reactive form
         │   │   └── customer-form-dialog/# Modal shell + save workflow
         │   ├── models/                  # Customer, query, column-catalog, response, form models
@@ -158,7 +158,7 @@ The staging CRM API ignores **every** query parameter and always returns the ful
 | ------------------ | ------------------------------------------------------------------------------------------------------------------ |
 | Dataset fetching   | Fetches the upstream `ReadAllCRMClients` dump once; single-flight (concurrent callers share one request)           |
 | Caching            | Stale-while-revalidate: fresh (5 min) → serve instantly; stale (< 1 h) → serve + background refresh; cold → block on one refresh; refresh failure → keep serving stale |
-| Paging contract    | `GET /api/customers?page=&pageSize=&search=&sortField=&sortDirection=&clientTypeId=&accountManagerId=&cityId=&countryId=&textFilters={json}&textOperators={json}` → `{ data, totalCount }` where `data` is **only the requested page** |
+| Paging contract    | `GET /api/customers?page=&pageSize=&search=&sortField=&sortDirection=&clientTypeId=&accountManagerId=&cityId=&countryId=&textFilters={json}&textOperators={json}&report={reportId}` → `{ data, totalCount }` where `data` is **only the requested page** |
 | Search             | Precomputed lowercase concatenation of all searchable fields per dataset (one `includes()` per record)             |
 | Sorting            | Precomputed natural-sort keys per (dataset, field); numbers as numbers, text tokenized into digit/text chunks, empty values last, stable `Id` tie-break |
 | Lookups            | `GET /api/customers/lookups` → distinct `{ value, label }` options for Client Types / Account Managers / Cities / Countries over the **full** dataset |
@@ -212,7 +212,7 @@ To run against the staging API: copy the example to `app-config.json` and paste 
 **True server-side pagination, delivered by the BFF** (see [The BFF](#the-bff)):
 
 1. The BFF caches the upstream dataset (fetched once, refreshed in the background per the stale-while-revalidate policy).
-2. Every table-state change (page, page size, search, filters, sort) produces **one** request carrying the complete state; the BFF applies `search → categorical filters → text filters → sort → paginate` over the cached dataset and returns **only the requested page** plus `totalCount`.
+2. Every table-state change (page, page size, search, filters, sort, active report) produces **one** request carrying the complete state; the BFF applies `report criteria → search → categorical filters → text filters → sort → paginate` over the cached dataset and returns **only the requested page** plus `totalCount`.
 3. The Angular store never holds more than `pageSize` records (5/10/20) — the grid renders exactly the returned page, and the paginator is driven by the server-provided total. 100,000+ records are never downloaded, let alone rendered.
 4. Requests are deduplicated (query-equality check) and cancelled (`switchMap`), so identical or superseded queries never hit the network.
 
@@ -266,7 +266,11 @@ A searchable **column picker** (far right of the toolbar) drives which of the 31
 The tiles below the grid are fully functional, store-synchronized modes rather than placeholders:
 
 - **Actions** — Collective Reassign (requires row selection), Customer Follow Up, Upload Bulk. Activating an action syncs the table columns to its `requiredColumns`; Collective Reassign additionally enables batch-select checkboxes on rows.
-- **Reports** — Customer List, Customers by Country, New Customers/Month, Top Account Managers. Activating a report configures the table columns and applies the report's default sort (the user's own sort is snapshotted and restored on deactivation).
+- **Reports** — Contacts Report, Customer Report, Account Follow Up Report. Activating a report configures the table columns, applies the report's default sort (the user's own sort is snapshotted and restored on deactivation) **and filters the table data source server-side**: the report id travels in every table request (`report` query param) and the BFF applies the report's criteria over its cached dataset before search/filter/sort/pagination. Report criteria are declared once per report (`filterCriteria` in `customer-reports.component.ts`, mirrored by `CUSTOMER_REPORT_CRITERIA` in `server/src/query.js`):
+  - **Contacts Report** — customers with contact channels on record (email, mobile or phone).
+  - **Customer Report** — customers already assigned to an account manager (managed accounts).
+  - **Account Follow Up Report** — accounts with no manager assigned yet (the follow-up queue).
+  Clicking the active report again (or the banner's Deactivate button) clears the report, restores the user's sort and returns the table to its normal state. Report criteria compose with search, user filters, sorting and pagination — every change produces exactly one BFF request through the store's single pipeline.
 - **Selection survives pagination**: selected records are stored as stable, id-keyed records, so the batch selection persists across page changes and is never lost when the BFF returns a different page.
 - Activating one mode deactivates the other; a toast confirms the state change, and no fake backend call is made (both sections work over the live data the grid already renders).
 
@@ -287,6 +291,7 @@ GET /api/CRM/ReadAllCRMClients
     &AccountManagerId=     # NEW — optional categorical filter id
     &CityId=               # NEW — optional categorical filter id
     &CountryId=            # NEW — optional categorical filter id
+    &Report=               # NEW — optional report id (contacts | customers | account-follow-up)
 
 Response (same shape as today):
 { "Data": [ only the requested page ], "Total": 12345 }   # Total = matching count
@@ -340,7 +345,7 @@ Async _operations_ (load, save, export) are exposed as Observables so callers ca
 ## Reactive Forms
 
 - The `CustomerFormComponent` is a fully typed `FormGroup` (one shared form for **create**, **edit**, and **view** modes).
-- Fields are organized into logical sections: **Basic Information, Contact Information, Identity, Address, Business/Financial, Contact Person** — with sensible `maxLength` guardrails, email validation, phone/pattern validation, URL validation, date validation (birth date with maxDate = today), and a required **Commercial Name**.
+- Fields are organized into logical sections: **Basic Information, Contact Information, Identity, Address, Business/Financial, Contact Person** — with sensible `maxLength` guardrails, email validation, phone/pattern validation, URL validation, date validation (birth date with maxDate = today), and required **Code** and **Commercial Name** fields.
 - Errors appear only after the user interacts with a field (`touched || dirty`), never pre-emptively.
 - Submitting marks all fields touched, blocks while `saving`, and emits the validated payload upward (`saved` output) — the dialog layer owns the HTTP call and feedback.
 - Contact person fields are mirrored into the API's `xmlContactPersonGrid` collection when any is filled.
@@ -432,7 +437,7 @@ npm test
 
 - **List**: initial load, debounced search, clear search, pagination (next/prev/first/last, page size), sorting, categorical + text filters with chips and operators, empty results, API error, loading state.
 - **Columns**: picker open/search, toggle columns, chip removal, last-column guard, reset, actions/reports overrides.
-- **Actions/Reports**: activate/deactivate modes, column sync, batch selection across pages.
+- **Actions/Reports**: activate/deactivate modes, column sync, server-side report filtering, batch selection across pages.
 - **Actions per row**: actions menu open, Edit, close, validation errors, save success, save API error.
 - **Add**: open, required/email/phone validation, successful creation, failed creation, list refresh after save.
 - **Export**: correct headers, values, filename, disabled state when nothing to export.

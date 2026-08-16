@@ -267,6 +267,9 @@ export class CustomerStore {
       textFilters: this.textFilters(),
       textFilterOperators: this.textFilterOperators(),
       filters: this.filters(),
+      // The active report becomes part of the request; the BFF applies its
+      // server-side criteria so the table data source is really filtered.
+      report: this.activeReport()?.id ?? null,
       page: this.page(),
       pageSize: this.pageSize(),
       sortField: this.sortField(),

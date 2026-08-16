@@ -125,6 +125,56 @@ export const CATEGORICAL_FILTER_FIELDS = {
   countryId: 'CountryId',
 };
 
+/**
+ * Report-criteria field map — canonical `CustomerReportCriteria` keys →
+ * raw API fields with "is set" semantics. Mirrors `isFieldSet` handling of
+ * the Angular normalizer (`readId` treats 0/empty ids as "not set", while
+ * plain text fields count as set when they hold any non-empty value).
+ *
+ * Only fields the Reports section actually filters on are listed; adding a
+ * report criterion is a one-line entry here.
+ */
+export const REPORT_FIELD_MAP = {
+  commercialName: ['CommercialName', 'CommericialName', 'Name', 'NameEN'],
+  code: ['Code'],
+  email: ['Email', 'ContEmail'],
+  mobile: ['MobileWithPrefix', 'Mobile', 'ContMobile'],
+  phone: ['PhoneWithPrefix', 'Phone', 'ContPhone'],
+  accountManagerId: { numeric: true, fields: ['AccountManagerId'] },
+  accountTypeId: { numeric: true, fields: ['AccountTypeId'] },
+  cityId: { numeric: true, fields: ['CityId'] },
+  countryId: { numeric: true, fields: ['CountryId'] },
+};
+
+/**
+ * True when the canonical field holds a value on `record`:
+ *   - text fields: any non-empty value (mirrors `firstValue`)
+ *   - numeric id fields: value > 0 (mirrors `readId`, where 0 = "not set")
+ */
+export function isReportFieldSet(record, key) {
+  const entry = REPORT_FIELD_MAP[key];
+  if (!entry) {
+    return false;
+  }
+  const fields = Array.isArray(entry) ? entry : entry.fields;
+  const numeric = !Array.isArray(entry) && entry.numeric === true;
+  return fields.some((field) => {
+    const value = record[field];
+    if (value === null || value === undefined) {
+      return false;
+    }
+    const text = String(value).trim();
+    if (text === '') {
+      return false;
+    }
+    if (numeric) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) && parsed > 0;
+    }
+    return true;
+  });
+}
+
 /** Reads the first populated value of a key list (mirrors the normalizer). */
 export function firstValue(record, keys) {
   for (const key of keys) {

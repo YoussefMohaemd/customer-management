@@ -1,5 +1,5 @@
 import type { CustomerFieldKey } from './customer-column.model';
-import type { CustomerSortField, SortDirection } from './customer-query.model';
+import type { CustomerReportId, CustomerSortField, SortDirection } from './customer-query.model';
 
 /**
  * Normalized customer record as returned by `ReadAllCRMClients`.
@@ -63,16 +63,35 @@ export interface CustomerActionDef {
   requiresSelection?: boolean;
 }
 
-/** Report definition that configures table column visibility, filters, and sort. */
+/**
+ * Declarative filter criteria of a report. The criteria are expressed on
+ * canonical field keys (the same keys the table columns use) and are applied
+ * SERVER-SIDE by the BFF (`report` query param → `CUSTOMER_REPORT_CRITERIA`
+ * in `server/src/query.js`), so selecting a report genuinely filters the
+ * table data source instead of faking it in the UI. User filters, search,
+ * sort and pagination all keep composing on top.
+ */
+export interface CustomerReportCriteria {
+  /** At least one of these fields must hold a value (e.g. contact channels). */
+  anyOf?: readonly CustomerFieldKey[];
+  /** Every one of these fields must hold a value (e.g. fully registered). */
+  allOf?: readonly CustomerFieldKey[];
+  /** Every one of these fields must be empty/0 (e.g. accounts awaiting follow-up). */
+  noneOf?: readonly CustomerFieldKey[];
+}
+
+/** Report definition that configures table columns, server-side filters, and sort. */
 export interface CustomerReportDef {
-  id: string;
+  id: CustomerReportId;
   icon: string;
   title: string;
   subtitle: string;
-  accent: string;
+  accent: 'blue' | 'indigo' | 'amber';
   requiredColumns: readonly CustomerFieldKey[];
   defaultSortField?: CustomerSortField;
   defaultSortDirection?: SortDirection;
+  /** Server-side filter criteria; `null`/empty criteria match every record. */
+  filterCriteria?: CustomerReportCriteria;
 }
 
 /** A single row of the `xmlContactPersonGrid` collection sent to the Save API. */
@@ -375,7 +394,11 @@ export function normalizeCustomerRecord(raw: unknown): CustomerRecord | null {
     clientType: pick(record, ['ClientType', 'clientType']),
     accountManagerId: readId(pick(record, ['AccountManagerId', 'accountManagerId'])),
     accountManagerName: pick(record, ['AccountManagerName', 'accountManagerName']),
-    classificationName: pick(record, ['ClassificationNam', 'ClassificationName', 'classificationName']),
+    classificationName: pick(record, [
+      'ClassificationNam',
+      'ClassificationName',
+      'classificationName',
+    ]),
     businessFieldName: pick(record, ['BusinessFieldName', 'businessFieldName']),
     regionName: pick(record, ['RegionName', 'regionName']),
     birthDate: readDate(pick(record, ['BirthDate', 'birthDate'])),

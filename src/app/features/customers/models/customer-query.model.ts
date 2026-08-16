@@ -1,5 +1,13 @@
 export type SortDirection = 'asc' | 'desc';
 
+/**
+ * Canonical ids of the declarative Reports section. Each report carries a
+ * `filterCriteria` that the BFF applies server-side (`report` query param),
+ * so a report click genuinely filters the table data source — never just the
+ * UI. See `CUSTOMER_REPORT_CRITERIA` in `server/src/query.js`.
+ */
+export type CustomerReportId = 'contacts' | 'customers' | 'account-follow-up';
+
 export type CustomerSortField =
   | 'id'
   | 'code'
@@ -243,6 +251,8 @@ export interface CustomerQuery {
   textFilters: Partial<Record<CustomerTextFilterKey, string>>;
   textFilterOperators: Partial<Record<CustomerTextFilterKey, CustomerFilterOperator>>;
   filters: CustomerFilters;
+  /** Active report id — the BFF applies the report's server-side criteria. */
+  report: CustomerReportId | null;
   page: number;
   pageSize: number;
   sortField: CustomerSortField | null;
@@ -276,6 +286,7 @@ export function createEmptyCustomerQuery(): CustomerQuery {
     textFilters: {},
     textFilterOperators: {},
     filters: { ...EMPTY_CUSTOMER_FILTERS },
+    report: null,
     page: 1,
     pageSize: 5,
     sortField: null,
@@ -289,7 +300,8 @@ export function isCustomerQueryEqual(a: CustomerQuery, b: CustomerQuery): boolea
     a.page !== b.page ||
     a.pageSize !== b.pageSize ||
     a.sortField !== b.sortField ||
-    a.sortDirection !== b.sortDirection
+    a.sortDirection !== b.sortDirection ||
+    a.report !== b.report
   ) {
     return false;
   }
@@ -311,10 +323,7 @@ export function isCustomerQueryEqual(a: CustomerQuery, b: CustomerQuery): boolea
     if ((a.textFilters[key] ?? '').trim() !== (b.textFilters[key] ?? '').trim()) {
       return false;
     }
-    if (
-      (a.textFilterOperators[key] ?? '') !==
-      (b.textFilterOperators[key] ?? '')
-    ) {
+    if ((a.textFilterOperators[key] ?? '') !== (b.textFilterOperators[key] ?? '')) {
       return false;
     }
   }
