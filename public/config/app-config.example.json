@@ -1,6 +1,5 @@
 {
   "auth": {
-    "scheme": "Bearer",
     "token": ""
   }
 }

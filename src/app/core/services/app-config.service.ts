@@ -1,7 +1,8 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 
+import { AuthService } from '@core/services/auth.service';
+
 export interface AppAuthConfig {
-  scheme: string;
   token: string;
 }
 
@@ -17,7 +18,11 @@ export class AppConfigService {
   private readonly configLoadError = signal<string | null>(null);
 
   readonly loaded = computed(() => this.config() !== null);
-  readonly auth = computed(() => this.config()?.auth ?? null);
+
+  /** The initial auth block from the runtime config file (empty token when absent). */
+  initialAuth(): AppAuthConfig {
+    return this.config()?.auth ?? { token: '' };
+  }
 
   /** Promise of the runtime configuration, resolved once during application bootstrap. */
   load(): Promise<void> {
@@ -47,18 +52,29 @@ export class AppConfigService {
   private sanitize(cfg: Partial<AppConfig>): AppConfig {
     return {
       auth: {
-        scheme: cfg.auth?.scheme?.trim() || 'Bearer',
         token: cfg.auth?.token?.trim() ?? '',
       },
     };
   }
 
   private emptyConfig(): AppConfig {
-    return { auth: { scheme: 'Bearer', token: '' } };
+    return { auth: { token: '' } };
   }
 }
 
+/**
+ * Loads the runtime config at bootstrap and seeds the initial JWT from it into
+ * localStorage exactly once (see {@link AuthService.seedInitialToken}). The
+ * config file is the only place the initial token value lives.
+ */
 export const appConfigInitializer = (): (() => Promise<void>) => {
-  const service = inject(AppConfigService);
-  return () => service.load();
+  const configService = inject(AppConfigService);
+  const authService = inject(AuthService);
+  return () =>
+    configService.load().then(() => {
+      const initialToken = configService.initialAuth().token;
+      if (initialToken) {
+        authService.seedInitialToken(initialToken);
+      }
+    });
 };

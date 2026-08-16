@@ -1,30 +1,43 @@
 import { HttpHandlerFn, HttpInterceptorFn, HttpRequest } from '@angular/common/http';
 import { inject } from '@angular/core';
 
-import { AppConfigService } from '@core/services/app-config.service';
+import { AuthService } from '@core/services/auth.service';
 
 /**
- * Adds the Authorization header to every outgoing request based on the
- * runtime configuration loaded from `config/app-config.json`.
+ * Endpoints that must never receive the JWT. Public/identity routes authenticate
+ * themselves (or are anonymous) and would reject or ignore a bearer token.
+ */
+const PUBLIC_URL_MARKERS: readonly string[] = ['/login', '/register', '/refresh-token', '/public/'];
+
+function isPublicUrl(url: string): boolean {
+  return PUBLIC_URL_MARKERS.some((marker) => url.includes(marker));
+}
+
+/**
+ * Attaches the JWT as `Authorization: Bearer <token>` to every outgoing
+ * request, read dynamically from {@link AuthService} at request time.
  *
- * The credential is intentionally not hard-coded anywhere in the source:
- * it is provided at runtime through a git-ignored configuration file.
+ * - Public endpoints are left untouched.
+ * - A request that already carries an explicit `Authorization` header is
+ *   preserved as-is (never doubled into `Bearer Bearer <token>`).
+ * - Without a stored token the request is forwarded unchanged.
  */
 export const authInterceptor: HttpInterceptorFn = (
   req: HttpRequest<unknown>,
   next: HttpHandlerFn,
 ) => {
-  const configService = inject(AppConfigService);
-  const auth = configService.auth();
-
-  if (!auth || !auth.token) {
+  if (isPublicUrl(req.url) || req.headers.has('Authorization')) {
     return next(req);
   }
 
-  const authorizedRequest = req.clone({
-    setHeaders: {
-      Authorization: `${auth.scheme} ${auth.token}`,
-    },
-  });
-  return next(authorizedRequest);
+  const token = inject(AuthService).getToken();
+  if (!token) {
+    return next(req);
+  }
+
+  return next(
+    req.clone({
+      setHeaders: { Authorization: `Bearer ${token}` },
+    }),
+  );
 };

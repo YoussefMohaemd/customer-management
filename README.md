@@ -107,7 +107,7 @@ No unnecessary frontend libraries were added. Everything else uses native Angula
         │   ├── interceptors/        # auth + user-friendly API error handling
         │   ├── layout/              # MainLayout, Sidebar, Topbar shell
         │   ├── models/              # ApiError + status→message map
-        │   └── services/            # Runtime config loader (auth token)
+        │   └── services/            # AuthService (JWT lifecycle) + runtime config loader
         │
         ├── shared/
         │   └── components/          # Reusable EmptyState / Flag components
@@ -191,21 +191,31 @@ Run it with `npm start --prefix server` (port 3000 by default, configurable in `
 
 ## Authentication
 
-- The Authorization header is **never hard-coded** in source or committed to Git.
-- **Angular** loads configuration at runtime from `public/config/app-config.json` (git-ignored) during bootstrap (`APP_INITIALIZER`); `authInterceptor` attaches `Authorization: <scheme> <token>` to every request.
+The Authorization header is **never hard-coded** in source and never duplicated across the project:
+
+```text
+Runtime config (initial token) → AuthService → localStorage (`access_token`) → HTTP interceptor → `Authorization: Bearer <token>` → API
+```
+
+- **Single source of truth — `AuthService`** (`core/services/auth.service.ts`) owns the JWT lifecycle (`setToken` / `getToken` / `removeToken` / `hasToken`). Nothing else reads or writes auth localStorage; components and API services never touch the token directly.
+- **Initial token** lives only in the git-ignored runtime config `public/config/app-config.json`. At bootstrap (`APP_INITIALIZER`) it is seeded **once** into browser localStorage under `access_token`, so the provided token is immediately active. A token the user explicitly removes stays removed (it is never silently restored on reload).
+- **`authInterceptor`** (`core/interceptors/auth.interceptor.ts`) reads the token from `AuthService` at request time and attaches `Authorization: Bearer <token>` to every outgoing request — except:
+  - **public endpoints** (`/login`, `/register`, `/refresh-token`, `/public/*`) that must never receive the JWT, and
+  - requests that already carry an explicit `Authorization` header (preserved as-is — never doubled into `Bearer Bearer <token>`).
+  With no token stored, requests are forwarded unchanged and the app does not crash.
+- **`401 Unauthorized`** is normalized into a user-friendly `ApiError` by `apiErrorInterceptor` and surfaced in the UI; the app never auto-refreshes tokens or retries in a loop (there is no refresh-token flow by design).
 - **The BFF** reads the same `public/config/app-config.json` file (or `BFF_UPSTREAM_TOKEN` env var) to authorize its upstream calls — one token file serves both tiers.
 - The committed `public/config/app-config.example.json` documents the expected shape:
 
 ```json
 {
   "auth": {
-    "scheme": "Bearer",
     "token": "PASTE_ASSESSMENT_TOKEN_HERE"
   }
 }
 ```
 
-To run against the staging API: copy the example to `app-config.json` and paste your token. If the file is missing, the Angular app simply sends requests without an Authorization header and the BFF refuses to start with an explicit message (or falls back to `BFF_UPSTREAM_TOKEN`).
+To run against the staging API: copy the example to `app-config.json` and paste your token. The token is seeded into localStorage on first launch and survives reloads. If the file is missing, the Angular app simply sends requests without an Authorization header and the BFF refuses to start with an explicit message (or falls back to `BFF_UPSTREAM_TOKEN`).
 
 ## Server-Side Pagination
 
@@ -415,6 +425,7 @@ The BFF configuration lives in `server/config.json` (port, upstream URL, cache T
 | `proxy.conf.json`                       | Dev-server proxy: `/api/customers`, `/api/health` → `http://localhost:3000`                                 |
 | `public/config/app-config.json`         | **Runtime, git-ignored** auth credentials (read by Angular **and** the BFF)                                |
 | `public/config/app-config.example.json` | Committed documentation of the config shape                                                                |
+| Browser `localStorage`                  | `access_token` — the JWT seeded from the config file at first launch, managed exclusively by `AuthService` |
 
 ## Build
 
@@ -458,7 +469,7 @@ These are **facts about the provided staging API** (verified against the Postman
 5. **No delete endpoint** — Delete shows an explicit confirmation that the action is unavailable in this assessment rather than simulating success.
 6. **No export endpoint** — Excel export covers the loaded matching set via the BFF export route (see [Excel Export](#excel-export)).
 7. **No lookup endpoints upstream** — dropdown options are served by the BFF lookups route over the full cached dataset. Dedicated upstream lookup endpoints are part of the proposed backend contract.
-8. **No auth endpoint** — the Authorization header must be supplied via the local runtime config (shared by Angular and the BFF).
+8. **No auth endpoint** — the Authorization header is seeded from the local runtime config into localStorage (`access_token`, managed by `AuthService`) and attached by the interceptor; see [Authentication](#authentication).
 
 ## Architectural Decisions
 
