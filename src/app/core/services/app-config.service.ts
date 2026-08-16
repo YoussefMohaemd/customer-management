@@ -30,16 +30,27 @@ export class AppConfigService {
       return Promise.resolve();
     }
     return fetch(CONFIG_URL, { cache: 'no-store' })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`Configuration file could not be loaded (HTTP ${response.status}).`);
+      .then(async (response) => {
+        const contentType = response.headers.get('content-type') || '';
+        if (!response.ok || contentType.includes('text/html')) {
+          throw new Error('Production authentication configuration is missing.');
         }
-        return response.json() as Promise<AppConfig>;
+        const data = (await response.json().catch(() => null)) as AppConfig | null;
+        if (!data || typeof data !== 'object') {
+          throw new Error('Production authentication configuration is missing.');
+        }
+        return data;
       })
-      .then((cfg) => this.config.set(this.sanitize(cfg)))
+      .then((cfg) => {
+        const sanitized = this.sanitize(cfg);
+        if (!sanitized.auth.token) {
+          this.configLoadError.set('Production authentication configuration is missing.');
+        }
+        this.config.set(sanitized);
+      })
       .catch((error: unknown) => {
         const message =
-          error instanceof Error ? error.message : 'Unable to load runtime configuration.';
+          error instanceof Error ? error.message : 'Production authentication configuration is missing.';
         this.configLoadError.set(message);
         this.config.set(this.emptyConfig());
       });
@@ -75,6 +86,8 @@ export const appConfigInitializer = (): (() => Promise<void>) => {
       const initialToken = configService.initialAuth().token;
       if (initialToken) {
         authService.seedInitialToken(initialToken);
+      } else if (!authService.hasToken()) {
+        console.warn('Production authentication configuration is missing.');
       }
     });
 };

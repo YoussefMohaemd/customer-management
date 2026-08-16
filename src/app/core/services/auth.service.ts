@@ -61,8 +61,7 @@ export class AuthService {
 
   /**
    * Seeds the initial JWT (from the runtime config file) into localStorage
-   * exactly once per browser. A token the user explicitly removed therefore
-   * stays removed across reloads instead of being silently restored.
+   * exactly once per browser if no token exists yet and it hasn't been seeded or removed.
    */
   seedInitialToken(token: string): void {
     const clean = token.trim();
