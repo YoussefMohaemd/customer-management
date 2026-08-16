@@ -25,35 +25,6 @@ export default async function handler(req, res) {
   const pathname = url.pathname;
   const method = req.method ?? 'GET';
 
-  // 0. Runtime configuration endpoint for app initialization
-  if (method === 'GET' && (pathname === '/config/app-config.json' || pathname === '/api/config')) {
-    let token = process.env.BFF_UPSTREAM_TOKEN || process.env.AUTH_TOKEN || '';
-    if (!token) {
-      try {
-        const fs = await import('node:fs');
-        const path = await import('node:path');
-        const configPath = path.join(process.cwd(), 'public', 'config', 'app-config.json');
-        if (fs.existsSync(configPath)) {
-          const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          token = parsed?.auth?.token ?? '';
-        }
-      } catch {
-        // Fallback if file not accessible
-      }
-    }
-    res.statusCode = 200;
-    return res.end(
-      JSON.stringify({
-        auth: {
-          token: token,
-        },
-        api: {
-          bffBaseUrl: '',
-        },
-      }),
-    );
-  }
-
   // 1. Health check endpoint
   if (method === 'GET' && pathname === '/api/health') {
     res.statusCode = 200;
