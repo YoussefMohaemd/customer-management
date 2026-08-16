@@ -69,11 +69,11 @@ export class AuthService {
       return;
     }
     try {
-      if (window.localStorage.getItem(INITIAL_TOKEN_SEEDED_KEY) !== null) {
-        return;
-      }
-      window.localStorage.setItem(INITIAL_TOKEN_SEEDED_KEY, 'true');
       window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, clean);
+      if (typeof console !== 'undefined' && console.debug) {
+        console.debug('[AuthService] seedInitialToken called: true');
+        console.debug('[AuthService] token stored: true');
+      }
     } catch {
       return;
     }

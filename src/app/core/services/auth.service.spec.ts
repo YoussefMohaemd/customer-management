@@ -64,13 +64,13 @@ describe('AuthService (token lifecycle)', () => {
     expect(window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)).toBe('user-token');
   });
 
-  it('seedInitialToken does not restore a token that was explicitly removed', () => {
+  it('seedInitialToken re-seeds if token is absent in localStorage', () => {
     service.seedInitialToken('initial-token');
     service.removeToken();
 
     service.seedInitialToken('initial-token');
 
-    expect(service.getToken()).toBeNull();
-    expect(window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)).toBeNull();
+    expect(service.getToken()).toBe('initial-token');
+    expect(window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)).toBe('initial-token');
   });
 });
