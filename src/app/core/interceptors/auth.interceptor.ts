@@ -32,7 +32,14 @@ export const authInterceptor: HttpInterceptorFn = (
 
   const token = inject(AuthService).getToken();
   if (!token) {
+    if (typeof console !== 'undefined' && console.debug) {
+      console.debug('[AuthInterceptor] No JWT token available in AuthService for request:', req.url);
+    }
     return next(req);
+  }
+
+  if (typeof console !== 'undefined' && console.debug) {
+    console.debug('[AuthInterceptor] Attaching Bearer Authorization header to request:', req.url);
   }
 
   return next(
@@ -41,3 +48,4 @@ export const authInterceptor: HttpInterceptorFn = (
     }),
   );
 };
+
