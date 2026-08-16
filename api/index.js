@@ -1,400 +1,341 @@
-import { readFileSync, existsSync } from 'node:fs';
-import path from 'node:path';
+import { createServer } from 'node:http';
+import { URL } from 'node:url';
 
-// Memory cache for dataset across lambdas in warm execution contexts
-let cachedDataset = null;
-let cacheTimestamp = 0;
-let inflightPromise = null;
-
-const CACHE_FRESH_MS = 300000; // 5 mins
-const UPSTREAM_BASE_URL = process.env.BFF_UPSTREAM_BASE_URL || 'https://testmobapi.erppluscloud.com';
-const READ_ENDPOINT = process.env.BFF_READ_ENDPOINT || '/api/CRM/ReadAllCRMClients';
-const SAVE_ENDPOINT = process.env.BFF_SAVE_ENDPOINT || '/api/CRM/SaveCustomerWithContactPerson';
-const DIRECTION = process.env.BFF_UPSTREAM_DIRECTION || 'ltr';
+const UPSTREAM_READ_URL =
+  'https://testmobapi.erppluscloud.com/api/CRM/ReadAllCRMClients?Text=&Direction=ltr&InCT=';
+const UPSTREAM_SAVE_URL =
+  'https://testmobapi.erppluscloud.com/api/CRM/SaveCustomerWithContactPerson?InCT=';
+const TIMEOUT_MS = 120000;
 
 export default async function handler(req, res) {
-  applyCors(req, res);
+  // Always return JSON
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
-  if (req.method === 'OPTIONS') {
-    res.status(204).end();
-    return;
-  }
-
-  try {
-    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-    const pathname = url.pathname;
-    const searchParams = url.searchParams;
-
-    // Health Endpoint
-    if (req.method === 'GET' && (pathname === '/api/health' || pathname === '/api/health/')) {
-      res.status(200).json({
-        status: 'ok',
-        environment: 'vercel-serverless',
-        cache: {
-          hasData: cachedDataset !== null,
-          recordCount: cachedDataset ? cachedDataset.length : 0,
-          ageMs: cacheTimestamp ? Date.now() - cacheTimestamp : 0,
-        },
-        upstream: {
-          url: `${UPSTREAM_BASE_URL}${READ_ENDPOINT}`,
-        },
-      });
-      return;
-    }
-
-    // Lookups Endpoint
-    if (req.method === 'GET' && (pathname === '/api/customers/lookups' || pathname === '/api/customers/lookups/')) {
-      const authHeader = extractAuthHeader(req);
-      const records = await getDataset(authHeader);
-      res.status(200).json(buildLookups(records));
-      return;
-    }
-
-    // Export Endpoint
-    if (req.method === 'GET' && (pathname === '/api/customers/export' || pathname === '/api/customers/export/')) {
-      const authHeader = extractAuthHeader(req);
-      const records = await getDataset(authHeader);
-      const { data, totalCount } = queryDataset(records, searchParams, { paginate: false });
-      res.status(200).json({ data, totalCount });
-      return;
-    }
-
-    // Customer Paged List Endpoint
-    if (req.method === 'GET' && (pathname === '/api/customers' || pathname === '/api/customers/')) {
-      const authHeader = extractAuthHeader(req);
-      const records = await getDataset(authHeader);
-      const result = queryDataset(records, searchParams, { paginate: true });
-      res.status(200).json(result);
-      return;
-    }
-
-    // Save Customer Proxy Endpoint
-    if (req.method === 'POST' && (pathname === '/api/customers/save' || pathname === '/api/customers/save/')) {
-      const authHeader = extractAuthHeader(req);
-      const body = req.body || {};
-      const { status, body: upstreamBody } = await proxySave(body, authHeader);
-      if (status >= 200 && status < 300) {
-        // Invalidate in-memory cache so next GET re-fetches
-        cachedDataset = null;
-        cacheTimestamp = 0;
-      }
-      res.status(status).json(upstreamBody);
-      return;
-    }
-
-    res.status(404).json({ error: `Route not found: ${req.method} ${pathname}` });
-  } catch (error) {
-    const status = Number(error?.status) || 500;
-    console.error(`[BFF Error] ${error?.message || error}`);
-    res.status(status).json({
-      error: String(error?.message || 'Internal server error'),
-    });
-  }
-}
-
-function applyCors(req, res) {
-  const origin = req.headers.origin || '*';
-  res.setHeader('Access-Control-Allow-Origin', origin);
-  res.setHeader('Vary', 'Origin');
+  // Handle CORS if needed
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Max-Age', '86400');
-}
 
-/** Extracts the Authorization header from browser req, or falls back to Vercel env var or local config. */
-function extractAuthHeader(req) {
-  const clientAuth = req.headers.authorization;
-  if (clientAuth && clientAuth.trim().length > 10) {
-    return clientAuth.trim();
+  if (req.method === 'OPTIONS') {
+    res.statusCode = 204;
+    return res.end();
   }
 
-  if (process.env.BFF_UPSTREAM_TOKEN) {
-    const token = process.env.BFF_UPSTREAM_TOKEN.trim();
-    return token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+  const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+  const pathname = url.pathname;
+  const method = req.method ?? 'GET';
+
+  // 1. Health check endpoint
+  if (method === 'GET' && pathname === '/api/health') {
+    res.statusCode = 200;
+    return res.end(JSON.stringify({ status: 'ok' }));
   }
 
-  // Local filesystem config fallback (if present in local dev)
-  try {
-    const configPath = path.join(process.cwd(), 'public', 'config', 'app-config.json');
-    if (existsSync(configPath)) {
-      const raw = JSON.parse(readFileSync(configPath, 'utf8'));
-      const token = raw.auth?.token?.trim();
-      if (token) {
-        return `Bearer ${token}`;
-      }
+  // Determine client authorization header
+  const authHeader = req.headers.authorization || (process.env.BFF_UPSTREAM_TOKEN ? `Bearer ${process.env.BFF_UPSTREAM_TOKEN}` : '');
+
+  // 2. Main Customers read endpoint
+  if (method === 'GET' && (pathname === '/api/customers' || pathname === '/api/customers/export' || pathname === '/api/customers/lookups')) {
+    if (!authHeader) {
+      res.statusCode = 401;
+      return res.end(
+        JSON.stringify({
+          error: 'Authorization header is missing. Please provide a Bearer token.',
+          status: 401,
+        }),
+      );
     }
-  } catch {
-    // Ignore fallback read errors
-  }
 
-  return '';
-}
+    try {
+      const upstreamResponse = await fetch(UPSTREAM_READ_URL, {
+        headers: {
+          Authorization: authHeader,
+        },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
 
-async function getDataset(authHeader) {
-  const now = Date.now();
-  if (cachedDataset && now - cacheTimestamp < CACHE_FRESH_MS) {
-    return cachedDataset;
-  }
-
-  if (inflightPromise) {
-    return inflightPromise;
-  }
-
-  inflightPromise = fetchUpstreamDataset(authHeader)
-    .then((records) => {
-      cachedDataset = records;
-      cacheTimestamp = Date.now();
-      inflightPromise = null;
-      return records;
-    })
-    .catch((err) => {
-      inflightPromise = null;
-      // If we have stale cache, return it on upstream failure
-      if (cachedDataset) {
-        console.warn('[BFF] Upstream read failed, serving stale dataset');
-        return cachedDataset;
+      if (!upstreamResponse.ok) {
+        const errorText = await upstreamResponse.text().catch(() => '');
+        res.statusCode = upstreamResponse.status;
+        return res.end(
+          JSON.stringify({
+            error: `Upstream ERP API failed with HTTP ${upstreamResponse.status}`,
+            status: upstreamResponse.status,
+            details: errorText.slice(0, 300),
+          }),
+        );
       }
-      throw err;
-    });
 
-  return inflightPromise;
-}
+      const json = await upstreamResponse.json();
+      const records = extractCollection(json);
+      const total = readTotal(json, records.length);
 
-async function fetchUpstreamDataset(authHeader) {
-  const url = `${UPSTREAM_BASE_URL}${READ_ENDPOINT}?Text=&Direction=${encodeURIComponent(DIRECTION)}&InCT=`;
-  const headers = {};
-  if (authHeader) {
-    headers['Authorization'] = authHeader;
+      if (pathname === '/api/customers/lookups') {
+        res.statusCode = 200;
+        return res.end(JSON.stringify(buildLookups(records)));
+      }
+
+      if (pathname === '/api/customers/export') {
+        const { data, totalCount } = queryDataset(records, url.searchParams, { paginate: false });
+        res.statusCode = 200;
+        return res.end(JSON.stringify({ data, totalCount }));
+      }
+
+      // Default GET /api/customers
+      const result = queryDataset(records, url.searchParams, { paginate: true });
+      res.statusCode = 200;
+      return res.end(JSON.stringify(result));
+    } catch (err) {
+      res.statusCode = 500;
+      return res.end(
+        JSON.stringify({
+          error: String(err?.message ?? 'Failed to reach upstream ERP API'),
+          status: 500,
+        }),
+      );
+    }
   }
 
-  const response = await fetch(url, { headers, signal: AbortSignal.timeout(60000) });
-  if (!response.ok) {
-    throw new Error(`Upstream ERP API read failed with HTTP ${response.status} ${response.statusText}`);
+  // 3. Save Customer endpoint
+  if (method === 'POST' && pathname === '/api/customers/save') {
+    if (!authHeader) {
+      res.statusCode = 401;
+      return res.end(
+        JSON.stringify({
+          error: 'Authorization header is missing. Please provide a Bearer token.',
+          status: 401,
+        }),
+      );
+    }
+
+    try {
+      const bodyText = await readRequestBody(req);
+      const upstreamResponse = await fetch(UPSTREAM_SAVE_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: authHeader,
+          'Content-Type': 'application/json',
+        },
+        body: bodyText,
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+
+      const responseText = await upstreamResponse.text();
+      let responseBody;
+      try {
+        responseBody = JSON.parse(responseText);
+      } catch {
+        responseBody = responseText;
+      }
+
+      res.statusCode = upstreamResponse.status;
+      return res.end(typeof responseBody === 'string' ? responseBody : JSON.stringify(responseBody));
+    } catch (err) {
+      res.statusCode = 500;
+      return res.end(
+        JSON.stringify({
+          error: String(err?.message ?? 'Failed to proxy save customer request to upstream ERP API'),
+          status: 500,
+        }),
+      );
+    }
   }
 
-  const json = await response.json();
-  const collection = extractCollection(json);
-  if (!collection || collection.length === 0) {
-    throw new Error('Upstream ERP API returned empty customer dataset.');
-  }
-
-  return collection;
-}
-
-async function proxySave(payload, authHeader) {
-  const url = `${UPSTREAM_BASE_URL}${SAVE_ENDPOINT}?InCT=`;
-  const headers = { 'Content-Type': 'application/json' };
-  if (authHeader) {
-    headers['Authorization'] = authHeader;
-  }
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(60000),
-  });
-
-  const text = await response.text();
-  let body;
-  try {
-    body = JSON.parse(text);
-  } catch {
-    body = text;
-  }
-
-  return { status: response.status, body };
+  res.statusCode = 404;
+  return res.end(JSON.stringify({ error: `Route not found: ${method} ${pathname}`, status: 404 }));
 }
 
 function extractCollection(json) {
   if (Array.isArray(json)) return json;
-  if (!json || typeof json !== 'object') return [];
+  if (typeof json !== 'object' || json === null) return [];
   if (Array.isArray(json.Data)) return json.Data;
   if (Array.isArray(json.data)) return json.data;
-  const nested = json.Result || json.result || json.Payload || json.payload;
-  if (nested && typeof nested === 'object') {
+  const nested = json.Result ?? json.result ?? json.Payload ?? json.payload;
+  if (typeof nested === 'object' && nested !== null) {
     if (Array.isArray(nested.Data)) return nested.Data;
     if (Array.isArray(nested.data)) return nested.data;
   }
   return [];
 }
 
-/** Queries, filters, sorts, and paginates in-memory dataset */
-function queryDataset(records, searchParams, { paginate = true }) {
-  let list = [...records];
+function readTotal(json, fallback) {
+  if (typeof json !== 'object' || json === null) return fallback;
+  const value = json.Total ?? json.total ?? json.totalCount ?? json.count;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
 
-  const search = (searchParams.get('search') || '').trim().toLowerCase();
-  if (search) {
-    list = list.filter((item) => {
-      const code = String(item.Code || '').toLowerCase();
-      const comm = String(item.CommercialName || '').toLowerCase();
-      const en = String(item.NameEN || '').toLowerCase();
-      const ar = String(item.NameAR || '').toLowerCase();
-      const email = String(item.Email || '').toLowerCase();
-      const mobile = String(item.Mobile || '').toLowerCase();
-      const phone = String(item.Phone || '').toLowerCase();
-      return (
-        code.includes(search) ||
-        comm.includes(search) ||
-        en.includes(search) ||
-        ar.includes(search) ||
-        email.includes(search) ||
-        mobile.includes(search) ||
-        phone.includes(search)
-      );
-    });
+async function readRequestBody(req) {
+  const chunks = [];
+  for await (const chunk of req) {
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+/* Helper Query logic for pagination/filtering/sorting */
+function queryDataset(records, params, { paginate = true } = {}) {
+  let list = records;
+
+  // Search
+  const term = (params.get('search') ?? '').trim().toLowerCase();
+  if (term) {
+    list = list.filter((record) =>
+      SEARCH_FIELDS.some((field) => String(record[field] ?? '').toLowerCase().includes(term)),
+    );
   }
 
   // Categorical filters
-  const clientTypeId = searchParams.get('clientTypeId');
-  if (clientTypeId !== null && clientTypeId !== undefined && clientTypeId !== '') {
-    const id = Number(clientTypeId);
-    list = list.filter((item) => Number(item.ClientTypeId || item.AccountTypeId) === id);
-  }
-
-  const accountManagerId = searchParams.get('accountManagerId');
-  if (accountManagerId !== null && accountManagerId !== undefined && accountManagerId !== '') {
-    const id = Number(accountManagerId);
-    list = list.filter((item) => Number(item.AccountManagerId) === id);
-  }
-
-  const cityId = searchParams.get('cityId');
-  if (cityId !== null && cityId !== undefined && cityId !== '') {
-    const id = Number(cityId);
-    list = list.filter((item) => Number(item.CityId) === id);
-  }
-
-  const countryId = searchParams.get('countryId');
-  if (countryId !== null && countryId !== undefined && countryId !== '') {
-    const id = Number(countryId);
-    list = list.filter((item) => Number(item.CountryId) === id);
-  }
-
-  // Reports filters
-  const report = searchParams.get('report');
-  if (report) {
-    if (report === 'active') {
-      list = list.filter((item) => item.Status === true || item.Status === 'Active' || item.Status === 1);
-    } else if (report === 'inactive') {
-      list = list.filter((item) => item.Status === false || item.Status === 'Inactive' || item.Status === 0);
+  for (const [param, field] of Object.entries(CATEGORICAL_FILTER_FIELDS)) {
+    const raw = params.get(param);
+    if (raw !== null && raw !== '') {
+      const id = Number(raw);
+      if (Number.isFinite(id)) {
+        list = list.filter((record) => Number(record[field]) === id);
+      }
     }
   }
 
   // Text filters
-  const textFiltersRaw = searchParams.get('textFilters');
-  const textOperatorsRaw = searchParams.get('textOperators');
-  if (textFiltersRaw) {
-    try {
-      const filters = JSON.parse(textFiltersRaw);
-      const operators = textOperatorsRaw ? JSON.parse(textOperatorsRaw) : {};
-      for (const [key, val] of Object.entries(filters)) {
-        const queryVal = String(val).trim().toLowerCase();
-        if (!queryVal) continue;
-        const op = operators[key] || 'contains';
-        const apiKey = MAP_FE_KEY_TO_API[key] || key;
-
-        list = list.filter((item) => {
-          const itemVal = String(item[apiKey] ?? '').toLowerCase();
-          if (op === 'startsWith') return itemVal.startsWith(queryVal);
-          if (op === 'endsWith') return itemVal.endsWith(queryVal);
-          if (op === 'equals') return itemVal === queryVal;
-          return itemVal.includes(queryVal);
-        });
-      }
-    } catch {
-      // Ignore text filter parsing error
-    }
+  const textFilters = parseJsonParam(params.get('textFilters'), {});
+  const operators = parseJsonParam(params.get('textOperators'), {});
+  for (const key of Object.keys(textFilters)) {
+    const value = String(textFilters[key] ?? '').trim();
+    if (!value) continue;
+    const fields = TEXT_FILTER_FIELDS[key];
+    if (!fields) continue;
+    const operator = String(operators[key] ?? 'contains');
+    list = list.filter((record) => matchesText(record, fields, value, operator));
   }
 
-  // Sorting
-  const sortField = searchParams.get('sortField');
-  const sortDirection = (searchParams.get('sortDirection') || 'asc').toLowerCase();
+  // Sort
+  const sortField = resolveSortField(params.get('sortField'));
+  const direction = params.get('sortDirection')?.toLowerCase() === 'desc' ? -1 : 1;
   if (sortField) {
-    const dir = sortDirection === 'desc' ? -1 : 1;
-    list.sort((a, b) => {
-      const valA = a[sortField] ?? '';
-      const valB = b[sortField] ?? '';
-      if (typeof valA === 'number' && typeof valB === 'number') {
-        return (valA - valB) * dir;
-      }
-      return String(valA).localeCompare(String(valB)) * dir;
+    list = [...list].sort((a, b) => {
+      const valA = a[sortField];
+      const valB = b[sortField];
+      if (valA == null) return 1;
+      if (valB == null) return -1;
+      if (valA === valB) return 0;
+      return valA > valB ? direction : -direction;
     });
   }
 
   const totalCount = list.length;
-  if (!paginate) {
-    return { data: list, totalCount };
+  let data = list;
+  if (paginate) {
+    const pageSize = Math.max(1, Number.parseInt(params.get('pageSize') ?? '5', 10));
+    const page = Math.max(1, Number.parseInt(params.get('page') ?? '1', 10));
+    const start = (page - 1) * pageSize;
+    data = list.slice(start, start + pageSize);
   }
-
-  const page = Math.max(1, Number(searchParams.get('page') || 1));
-  const pageSize = Math.max(1, Number(searchParams.get('pageSize') || 5));
-  const start = (page - 1) * pageSize;
-  const data = list.slice(start, start + pageSize);
 
   return { data, totalCount };
 }
 
-const MAP_FE_KEY_TO_API = {
+function buildLookups(records) {
+  return {
+    clientTypes: distinctOptions(records, 'AccountTypeId', ['AccountTypeName']),
+    accountManagers: distinctOptions(records, 'AccountManagerId', ['AccountManagerName']),
+    cities: distinctOptions(records, 'CityId', ['CityName', 'City']),
+    countries: distinctOptions(records, 'CountryId', ['CountryName', 'Country']),
+  };
+}
+
+function distinctOptions(records, idField, labelFields) {
+  const seen = new Map();
+  for (const record of records) {
+    const id = Number(record[idField]);
+    if (!Number.isFinite(id) || id <= 0 || seen.has(id)) continue;
+    const label = firstValue(record, labelFields);
+    seen.set(id, label === null ? String(id) : String(label));
+  }
+  return [...seen.entries()]
+    .map(([value, label]) => ({ value, label }))
+    .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
+}
+
+function firstValue(record, keys) {
+  for (const key of keys) {
+    const value = record[key];
+    if (value !== null && value !== undefined && String(value).trim() !== '') {
+      return value;
+    }
+  }
+  return null;
+}
+
+function parseJsonParam(raw, fallback) {
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw);
+    return typeof parsed === 'object' && parsed !== null ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function matchesText(record, fields, needle, operator) {
+  const val = firstValue(record, fields);
+  if (val === null) return false;
+  const haystack = String(val).toLowerCase();
+  const target = needle.toLowerCase();
+  switch (operator) {
+    case 'equals': return haystack === target;
+    case 'startsWith': return haystack.startsWith(target);
+    case 'endsWith': return haystack.endsWith(target);
+    case 'contains':
+    default: return haystack.includes(target);
+  }
+}
+
+const SEARCH_FIELDS = [
+  'CommercialName', 'CommericialName', 'Name', 'NameEN', 'NameAR', 'Code',
+  'Email', 'ContEmail', 'MobileWithPrefix', 'Mobile', 'ContMobile',
+  'PhoneWithPrefix', 'Phone', 'ContPhone', 'AccountManagerName',
+  'CountryName', 'Country', 'CityName', 'City', 'AccountTypeName',
+  'ClientType', 'ClassificationNam', 'BusinessFieldName', 'RegionName',
+];
+
+const CATEGORICAL_FILTER_FIELDS = {
+  clientTypeId: 'AccountTypeId',
+  accountManagerId: 'AccountManagerId',
+  cityId: 'CityId',
+  countryId: 'CountryId',
+};
+
+const TEXT_FILTER_FIELDS = {
+  id: ['Id', 'ID'],
+  code: ['Code', 'code'],
+  name: ['CommercialName', 'CommericialName', 'Name', 'NameEN'],
+  nameEn: ['NameEN', 'NameEn', 'EnglishName'],
+  nameAr: ['NameAR', 'NameAr', 'ArabicName'],
+  email: ['Email', 'ContEmail'],
+  mobile: ['MobileWithPrefix', 'Mobile', 'ContMobile'],
+  phone: ['PhoneWithPrefix', 'Phone', 'ContPhone'],
+  clientType: ['ClientType'],
+  city: ['CityName', 'City'],
+  country: ['CountryName', 'Country'],
+};
+
+const CANONICAL_TO_API_FIELD = {
   id: 'Id',
   code: 'Code',
   commercialName: 'CommercialName',
   nameEn: 'NameEN',
   nameAr: 'NameAR',
+  clientType: 'ClientType',
   email: 'Email',
   mobile: 'Mobile',
   phone: 'Phone',
-  phone2: 'Phone2',
-  fax: 'Fax',
-  website: 'Website',
-  jobTitle: 'JobTitle',
-  accountTypeName: 'AccountTypeName',
   accountManagerName: 'AccountManagerName',
   city: 'CityName',
   country: 'CountryName',
-  classificationName: 'ClassificationName',
-  businessFieldName: 'BusinessFieldName',
-  regionName: 'RegionName',
-  address: 'Address',
-  comment: 'Comment',
-  taxFileNumber: 'TaxFileNumber',
-  commercialRegistrationNumber: 'CommercialRegistrationNumber',
-  vatRegistrationNumber: 'VATRegistrationNumber',
 };
 
-function buildLookups(records) {
-  const clientTypesMap = new Map();
-  const accountManagersMap = new Map();
-  const citiesMap = new Map();
-  const countriesMap = new Map();
-
-  for (const item of records) {
-    if (item.ClientTypeId && item.AccountTypeName) {
-      clientTypesMap.set(Number(item.ClientTypeId), String(item.AccountTypeName));
-    } else if (item.AccountTypeId && item.AccountTypeName) {
-      clientTypesMap.set(Number(item.AccountTypeId), String(item.AccountTypeName));
-    }
-
-    if (item.AccountManagerId && item.AccountManagerName) {
-      accountManagersMap.set(Number(item.AccountManagerId), String(item.AccountManagerName));
-    }
-    if (item.CityId && item.CityName) {
-      citiesMap.set(Number(item.CityId), String(item.CityName));
-    }
-    if (item.CountryId && item.CountryName) {
-      countriesMap.set(Number(item.CountryId), String(item.CountryName));
-    }
-  }
-
-  return {
-    clientTypes: mapToOptions(clientTypesMap),
-    accountManagers: mapToOptions(accountManagersMap),
-    cities: mapToOptions(citiesMap),
-    countries: mapToOptions(countriesMap),
-  };
-}
-
-function mapToOptions(map) {
-  return Array.from(map.entries())
-    .map(([value, label]) => ({ value, label }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+function resolveSortField(value) {
+  if (!value) return null;
+  if (CANONICAL_TO_API_FIELD[value]) return CANONICAL_TO_API_FIELD[value];
+  return Object.values(CANONICAL_TO_API_FIELD).includes(value) ? value : null;
 }
